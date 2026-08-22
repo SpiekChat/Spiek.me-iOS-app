@@ -1,0 +1,38 @@
+Spiek Source-Available License v1.0
+
+Copyright (c) 2026 Mister HHC B.V., the Netherlands (KvK / CoC 89626222).
+All rights reserved.
+
+Permission is hereby granted, free of charge, to view and read this source
+code, to clone it and compile it locally and run its test suites, and to fork
+this repository on GitHub solely as permitted by the GitHub Terms of Service,
+for the purposes of transparency, security review, and audit.
+
+No other rights are granted. Without prior written permission from
+Mister HHC B.V., you may not:
+
+  1. copy, modify, adapt, translate, or create derivative works of this
+     code, in whole or in substantial part;
+  2. redistribute, republish, or mirror this code outside this repository;
+  3. use this code, or substantial portions of it, in any product or
+     service, whether commercial or non-commercial;
+  4. package, ship, or submit this application or a modified version of it
+     to the App Store, TestFlight, Google Play, or any other app store,
+     web host or distribution channel.
+
+"Spiek" and the Spiek logo are trade names and marks of Mister HHC B.V.;
+this license grants no rights to them. Unsolicited code contributions are
+not accepted under this license (see CONTRIBUTING.md); bug reports and
+security reports are very welcome.
+
+Security researchers are welcome: responsible disclosure of findings via
+GitHub Security Advisories on this repository is encouraged and appreciated.
+
+For licensing enquiries: hello@spiek.me
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OF OR OTHER DEALINGS IN THE SOFTWARE.

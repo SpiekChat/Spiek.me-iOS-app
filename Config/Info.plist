@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Spiek</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+
+	<!-- Bundled typefaces (SIL Open Font License) -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>SpaceGrotesk_600SemiBold.ttf</string>
+		<string>SpaceGrotesk_700Bold.ttf</string>
+		<string>IBMPlexSans_400Regular.ttf</string>
+		<string>IBMPlexSans_500Medium.ttf</string>
+		<string>IBMPlexSans_600SemiBold.ttf</string>
+		<string>IBMPlexMono_400Regular.ttf</string>
+		<string>IBMPlexMono_500Medium.ttf</string>
+	</array>
+
+	<!-- Launch screen: the ink field the onboarding continues from -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+		<key>UIImageName</key>
+		<string>SpiekMark</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<true/>
+	</dict>
+
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
+
+	<!-- Required to evaluate the device-owner policy on a Face ID phone;
+	     without it authentication fails outright. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Spiek uses Face ID to unlock the app and to show your recovery phrase.</string>
+
+	<!-- The app only reads photos the user explicitly picks. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Spiek only reads the photos you pick yourself, to send them in a chat.</string>
+
+	<!-- Export compliance. Spiek ships its own AES-256-GCM for end-to-end
+	     message confidentiality, which is NOT one of Apple's exempt cases
+	     (authentication and signing alone would be). Keep this true and
+	     complete the encryption questions in App Store Connect — see the
+	     "Export compliance" section of BUILD.md. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<true/>
+
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+	</dict>
+</dict>
+</plist>
