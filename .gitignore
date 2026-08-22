@@ -1,0 +1,7 @@
+.DS_Store
+xcuserdata/
+build/
+DerivedData/
+*.xcuserstate
+SpiekCore/.build/
+SpiekCore/.swiftpm/
