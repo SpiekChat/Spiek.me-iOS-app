@@ -99,22 +99,40 @@ public enum ChannelID {
 }
 
 /// The shareable invite codes the "New chat" screen produces and consumes.
+///
+/// v1.20: an encrypted group's invite carries the 32-byte symmetric key as a
+/// fourth segment — `spiek:group:<channel-id>:<64-hex-key>`. The key is the
+/// membership: everyone with the invite can read the group. Keyless codes keep
+/// meaning what they always meant (a public group), and only groups may carry
+/// a key.
 public enum InviteCode {
-    public static func encode(channelId: String, kind: ChannelKind) -> String {
+    public static func encode(channelId: String, kind: ChannelKind, groupKey: String? = nil) -> String {
         switch kind {
-        case .group: return "spiek:group:\(channelId)"
+        case .group:
+            if let groupKey, !groupKey.isEmpty { return "spiek:group:\(channelId):\(groupKey)" }
+            return "spiek:group:\(channelId)"
         default: return "spiek:chat:\(channelId)"
         }
     }
 
-    public static func decode(_ code: String) -> (channelId: String, kind: ChannelKind)? {
+    private static func isKeyHex(_ text: String) -> Bool {
+        text.count == 64 && text.allSatisfy { "0123456789abcdef".contains($0) }
+    }
+
+    public static func decode(_ code: String) -> (channelId: String, kind: ChannelKind, groupKey: String?)? {
         let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
         let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
-        guard parts.count == 3, parts[0].lowercased() == "spiek" else { return nil }
+        guard parts.count == 3 || parts.count == 4, parts[0].lowercased() == "spiek" else { return nil }
         guard ChannelID.bytes(from: parts[2]) != nil else { return nil }
+        var key: String?
+        if parts.count == 4 {
+            let candidate = parts[3].lowercased()
+            guard isKeyHex(candidate) else { return nil }
+            key = candidate
+        }
         switch parts[1].lowercased() {
-        case "group": return (parts[2], .group)
-        case "chat", "dm": return (parts[2], .dm)
+        case "group": return (parts[2].lowercased(), .group, key)
+        case "chat", "dm": return key == nil ? (parts[2].lowercased(), .dm, nil) : nil
         default: return nil
         }
     }

@@ -170,9 +170,12 @@ struct ConversationView: View {
             // difference between a private diary and a public one.
             return model.chatIsEncrypted ? "just you · encrypted" : "just you · not encrypted"
         case .group:
-            // Groups have no shared secret; say so rather than let the absent
-            // lock icon imply privacy.
-            return "group · not encrypted · tap to copy code"
+            // v1.20: a keyed group is encrypted under the invite key; a
+            // keyless one is public. Say which, rather than let the absent
+            // lock icon imply either way.
+            return channel.groupKey != nil
+                ? "encrypted group · everyone with the invite can read"
+                : "public group · permanently stored on-chain · tap to copy code"
         case .dm:
             if channel.peerPub == nil { return "waiting for them · tap to copy code" }
             if model.chatIsEncrypted { return "encrypted · tap to verify keys" }
@@ -219,12 +222,13 @@ struct ConversationView: View {
                 }
             } label: {
                 if armDelete {
-                    Text("Delete?")
+                    Text("Remove?")
                         .font(.mono(11))
                         .foregroundStyle(Palette.danger)
                 } else {
                     Image(systemName: "trash")
                         .foregroundStyle(Palette.stamp)
+                        .accessibilityLabel("Remove chat from this device — the chain keeps its history")
                 }
             }
             .animation(.easeOut(duration: 0.2), value: armDelete)
@@ -277,6 +281,8 @@ struct ConversationView: View {
                 .padding(.top, 8)
             }
             .scrollDismissesKeyboard(.interactively)
+            // v1.20: a tap between the bubbles closes the keyboard too.
+            .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
             .onChange(of: model.messages.count) { _, _ in
                 withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom", anchor: .bottom) }
             }
@@ -387,6 +393,9 @@ struct ConversationView: View {
                 .submitLabel(.send)
 
             Button {
+                // v1.20: fold the keyboard away on send — `composerFocused`
+                // used to stay true forever, so the keyboard never closed.
+                composerFocused = false
                 Task { await model.sendDraft() }
             } label: {
                 Image(systemName: model.editingTxid != nil ? "checkmark" : "arrow.up")

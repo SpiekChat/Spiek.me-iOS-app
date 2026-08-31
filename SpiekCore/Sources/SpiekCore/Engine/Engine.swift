@@ -37,6 +37,20 @@ public struct ViewMessage: Identifiable, Equatable, Sendable {
 
     public var id: String { record.txid }
 
+    /// v1.20: public on purpose — the app builds a synthetic pending row for
+    /// the optimistic send echo and replaces it on the next reload.
+    public init(record: MessageRecord,
+                viewOp: SpiekOp,
+                viewPayload: [UInt8],
+                encrypted: Bool,
+                unreadable: Bool) {
+        self.record = record
+        self.viewOp = viewOp
+        self.viewPayload = viewPayload
+        self.encrypted = encrypted
+        self.unreadable = unreadable
+    }
+
     public var text: String {
         if let edited { return Codecs.decodeText(edited) }
         return Codecs.decodeText(viewPayload)
@@ -875,18 +889,34 @@ public actor Engine {
         var outerPayload = request.payload
         var outerRef = request.ref
 
-        // Only content-bearing records are encrypted; an `open` announces a
-        // public key and reactions are too small to hide anything.
+        // Only content-bearing records are encrypted in a DM; an `open`
+        // announces a public key and reactions are too small to hide anything.
+        // v1.20, encrypted groups: when the channel holds a group key, *every*
+        // record except `open` is sealed under it (matching the web build) —
+        // reactions, edits and withdrawals included, since the group cipher
+        // costs nothing extra and a plaintext reaction would leak the emoji.
+        let groupKeyBytes: [UInt8]? = {
+            guard channel.kind == .group, request.op != .open,
+                  let hex = channel.groupKey,
+                  let bytes = Hex.decode(hex), bytes.count == 32 else { return nil }
+            return bytes
+        }()
         let encryptable: Set<SpiekOp> = [.msg, .media, .edit]
-        let shouldEncrypt = (request.encrypt ?? Engine.encryptsByDefault(channel))
-            && encryptable.contains(request.op)
+        let shouldEncrypt = groupKeyBytes != nil ||
+            ((request.encrypt ?? Engine.encryptsByDefault(channel)) && encryptable.contains(request.op))
 
         if shouldEncrypt {
-            guard let peerPubHex = channel.peerPub,
-                  let peerPubBytes = Hex.decode(peerPubHex),
-                  let peerKey = PublicKey(bytes: peerPubBytes),
-                  let symmetric = wallet.key.conversationKey(with: peerKey) else {
-                throw EngineError.peerKeyUnknown
+            let symmetric: [UInt8]
+            if let groupKeyBytes {
+                symmetric = groupKeyBytes
+            } else {
+                guard let peerPubHex = channel.peerPub,
+                      let peerPubBytes = Hex.decode(peerPubHex),
+                      let peerKey = PublicKey(bytes: peerPubBytes),
+                      let conversationKey = wallet.key.conversationKey(with: peerKey) else {
+                    throw EngineError.peerKeyUnknown
+                }
+                symmetric = conversationKey
             }
             let inner = try InnerEnvelope(op: request.op, payload: request.payload, ref: request.ref).encoded()
             outerPayload = try AESGCM.seal(plaintext: inner, key: symmetric)
@@ -967,19 +997,23 @@ public actor Engine {
     public func openChat(peerAddressOrHash: String? = nil,
                          name: String? = nil,
                          kind: ChannelKind = .dm,
-                         channelId existingChannelId: String? = nil) async throws -> String {
+                         channelId existingChannelId: String? = nil,
+                         /// v1.20: the 64-hex group key from a keyed invite, or nil.
+                         groupKey inviteGroupKey: String? = nil) async throws -> String {
         await lockCompose()
         defer { unlockCompose() }
         return try await performOpenChat(peerAddressOrHash: peerAddressOrHash,
                                          name: name,
                                          kind: kind,
-                                         channelId: existingChannelId)
+                                         channelId: existingChannelId,
+                                         groupKey: inviteGroupKey)
     }
 
     private func performOpenChat(peerAddressOrHash: String?,
                                  name: String?,
                                  kind: ChannelKind,
-                                 channelId existingChannelId: String?) async throws -> String {
+                                 channelId existingChannelId: String?,
+                                 groupKey inviteGroupKey: String? = nil) async throws -> String {
         var peerHash: [UInt8]?
         if let peerAddressOrHash, !peerAddressOrHash.isEmpty {
             if peerAddressOrHash.count == 40, let bytes = Hex.decode(peerAddressOrHash) {
@@ -1002,11 +1036,29 @@ public actor Engine {
 
         let existing = try await store.channel(channelId)
         if existing == nil {
+            // v1.20: a freshly *created* group (no channelId passed in) gets a
+            // random 32-byte key and is encrypted from its first message. A
+            // *joined* group takes whatever the invite carried — a keyless
+            // invite joins a public group, exactly as before.
+            let groupKey: String?
+            if kind == .group {
+                groupKey = inviteGroupKey ?? (existingChannelId == nil ? SecureRandom.bytes(32).hex : nil)
+            } else {
+                groupKey = nil
+            }
             try await store.putChannel(ChannelRecord(channelId: channelId,
                                                      kind: kind,
                                                      name: name,
                                                      peerHash: peerHash?.hex,
-                                                     lastTime: now()))
+                                                     lastTime: now(),
+                                                     groupKey: groupKey))
+        } else if kind == .group, existing?.groupKey == nil,
+                  let inviteGroupKey, !inviteGroupKey.isEmpty,
+                  var adopting = existing {
+            // Re-loading a fuller invite for a group we already follow adopts
+            // the key, so earlier unreadable records open on the next render.
+            adopting.groupKey = inviteGroupKey
+            try await store.putChannel(adopting)
         }
 
         var extraPayTo = [PayTarget]()
@@ -1242,6 +1294,17 @@ public actor Engine {
         }
 
         let channel = try await store.channel(record.channel)
+        // v1.20, encrypted groups: a group record decrypts under the channel's
+        // symmetric key. No key (a public group, or an invite we only hold in
+        // its keyless form) means the record stays unreadable — same rendering
+        // as a foreign DM.
+        if channel?.kind == .group {
+            guard let keyHex = channel?.groupKey,
+                  let key = Hex.decode(keyHex), key.count == 32,
+                  let groupSealed = Hex.decode(record.payload),
+                  let groupPlain = try? AESGCM.open(sealed: groupSealed, key: key) else { return nil }
+            return InnerEnvelope.decode(groupPlain)
+        }
         let counterpartyHex = record.mine ? channel?.peerPub : record.senderPub
         guard let counterpartyHex,
               let counterpartyBytes = Hex.decode(counterpartyHex),

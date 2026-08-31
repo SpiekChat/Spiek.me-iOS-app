@@ -238,7 +238,13 @@ struct YouView: View {
                         endpointRow("Watch address", text: $draft.watchURL)
                         endpointRow("Broadcast", text: $draft.broadcastURL)
                         endpointRow("UTXOs", text: $draft.utxoURL)
+                        endpointRow("BSV21 token index", text: $draft.tokenURL)
                     }
+                    Text("Token index: the shared Spiek BSV21 indexer base (…/bsv21/v1). Leave it empty and the wallet shows no token section.")
+                        .font(.sans(12))
+                        .foregroundStyle(Palette.stamp)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 6)
                 }
 
                 VStack(spacing: 10) {

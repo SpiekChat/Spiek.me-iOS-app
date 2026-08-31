@@ -114,6 +114,11 @@ public struct ChannelRecord: Codable, Identifiable, Equatable, Sendable {
     public var lastSort: Double
     public var lastRead: Int
     public var unread: Int
+    /// v1.20, encrypted groups: hex of the 32-byte symmetric group key. It
+    /// travels in the invite code and never touches the chain. Nil for direct
+    /// messages, notes and the public (pre-1.20 or keyless) groups. Optional,
+    /// so channel rows written by an earlier build still decode.
+    public var groupKey: String?
 
     public var id: String { channelId }
 
@@ -128,7 +133,8 @@ public struct ChannelRecord: Codable, Identifiable, Equatable, Sendable {
                 lastTime: Int = 0,
                 lastSort: Double = 0,
                 lastRead: Int = 0,
-                unread: Int = 0) {
+                unread: Int = 0,
+                groupKey: String? = nil) {
         self.channelId = channelId
         self.kind = kind
         self.name = name
@@ -141,11 +147,12 @@ public struct ChannelRecord: Codable, Identifiable, Equatable, Sendable {
         self.lastSort = lastSort
         self.lastRead = lastRead
         self.unread = unread
+        self.groupKey = groupKey
     }
 
-    public var inviteCode: String { InviteCode.encode(channelId: channelId, kind: kind) }
+    public var inviteCode: String { InviteCode.encode(channelId: channelId, kind: kind, groupKey: groupKey) }
 
-    /// Group chats have no shared secret: anyone holding the code can read and
+    /// Keyless group chats have no shared secret: anyone holding the code can read and
     /// write. Worth saying out loud wherever a group is shown. Notes-to-self do
     /// have one — they encrypt against the wallet's own key.
     public var isEncryptable: Bool { kind == .dm || kind == .note }
@@ -276,6 +283,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var watchURL: String
     public var broadcastURL: String
     public var utxoURL: String
+    /// BSV21 token-index base URL (…/bsv21/v1); blank = no token section.
+    public var tokenURL: String = ""
 
     /// Miners started rejecting anything under this, so it is both the
     /// default and a hard floor.
@@ -299,7 +308,8 @@ public struct Settings: Codable, Equatable, Sendable {
                 getTxURL: String = "",
                 watchURL: String = "",
                 broadcastURL: String = "",
-                utxoURL: String = "") {
+                utxoURL: String = "",
+                tokenURL: String = "") {
         self.mode = mode
         self.feePerByte = feePerByte
         self.dust = dust
@@ -312,6 +322,7 @@ public struct Settings: Codable, Equatable, Sendable {
         self.watchURL = watchURL
         self.broadcastURL = broadcastURL
         self.utxoURL = utxoURL
+        self.tokenURL = tokenURL
     }
 
     /// Tolerant decoding, so a settings blob written by an earlier build keeps
@@ -330,6 +341,7 @@ public struct Settings: Codable, Equatable, Sendable {
         watchURL = try c.decodeIfPresent(String.self, forKey: .watchURL) ?? ""
         broadcastURL = try c.decodeIfPresent(String.self, forKey: .broadcastURL) ?? ""
         utxoURL = try c.decodeIfPresent(String.self, forKey: .utxoURL) ?? ""
+        tokenURL = try c.decodeIfPresent(String.self, forKey: .tokenURL) ?? ""
     }
 
     /// Clamps anything a stored settings blob or the settings screen might

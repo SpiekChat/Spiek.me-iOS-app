@@ -10,6 +10,74 @@ Full build notes, design decisions and the on-device test matrix live in
 
 ---
 
+## [1.20.0] — 2026-08-23 (build 20) — encrypted groups, BSV21 balances, fuzzing
+
+Builds 18 and 19 were internal steps toward this release and never shipped;
+build 20 carries the whole round, keeping the version in step with the web
+build (v20) and Android (1.21.0).
+
+### Added
+
+- **Encrypted groups.** A group created on 1.20 receives a random 32-byte key
+  and the key travels in the invite: `spiek:group:<channel-id>:<64-hex-key>`.
+  Every group record except `open` — messages, media, reactions, edits,
+  withdrawals — is sealed with AES-256-GCM under that key inside the existing
+  `emsg` envelope; the on-chain format did not change. Joining with a keyed
+  code stores the key, and loading the fuller code for a group you already
+  follow adopts it, opening earlier records. A keyless code still joins a
+  public group, exactly as before. This is group privacy, not end-to-end
+  secrecy: the invite *is* the key.
+- **Group golden vectors.** `SpiekCore/Tests/…/Resources/group_vectors.json` —
+  8 positive and 4 negative vectors produced by an implementation independent
+  of all three clients (Node/OpenSSL), shared verbatim with the web and
+  Android suites, checked by `GroupVectorTests` (decrypt + inner-record
+  compare + own-seal round trip; negatives must fail).
+- **Fuzz suite.** `FuzzTests` — thousands of deterministic mutations (bit
+  flips, truncation, lying pushdata length prefixes, random byte soup,
+  corrupted Base58 addresses, malformed invite codes, mutated group
+  ciphertexts) against the real decoders. A decoder either rejects or returns
+  a fully valid result; it never crashes and never accepts a ref-carrying
+  record without its ref.
+- **BSV21 token balances.** New endpoint row *You → BSV21 token index* (the
+  shared Spiek indexer base, `…/bsv21/v1`; empty = no token section). The
+  wallet shows a Tokens section fetched from
+  `{base}/address/{address}/balance`: amounts stay strings and are scaled in
+  integer math (nothing rounded), a non-`valid` status is shown, and an
+  unreachable index reads *token index unreachable — balances hidden, nothing
+  is lost*. Display-only; coin selection has always skipped 1-sat outputs, so
+  token UTXOs are never spent as ordinary coins.
+- **Optimistic send echo.** The bubble appears the moment send is tapped
+  (status *pending*) and is replaced by the real record on the next reload —
+  a poll holding the engine can no longer delay your own message's
+  appearance. A failed send clears the synthetic row.
+
+### Fixed
+
+- **The keyboard closes again.** `composerFocused` was set on focus but never
+  cleared, so the on-screen keyboard stayed up forever. Send now drops focus,
+  and a tap between the bubbles dismisses the keyboard too (scroll already
+  did, interactively).
+
+### Changed
+
+- **Honest wording.** The chat-header remove control arms as *Remove?* and
+  its accessibility label says what it does — removes the chat from this
+  device, the chain keeps its history. The group subheader reads *encrypted
+  group · everyone with the invite can read* or *public group · permanently
+  stored on-chain*, and the new-chat and group-created sheets explain that a
+  keyed invite carries the group key.
+
+### Security
+
+- Group encryption reuses the audited path end to end: the same canonical
+  inner envelope, the same `emsg` outer record, the same `AESGCM`
+  implementation — only the key source differs (invite key instead of ECDH).
+  A record we hold no key for renders as unreadable, exactly like a foreign
+  DM. The group key is stored locally in the channel row and never touches
+  the chain.
+
+---
+
 ## [1.17.0] — 2026-08-14 (build 17) — pre-release review
 
 Every finding from the full-codebase review fixed, wallet correctness first.

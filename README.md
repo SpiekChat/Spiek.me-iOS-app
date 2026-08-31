@@ -1,7 +1,7 @@
-# Spiek.me — iOS app (v1.17.0)
+# Spiek.me — iOS app (v1.20.0)
 
 [![SpiekCore tests](https://github.com/SpiekChat/Spiek.me-iOS-app/actions/workflows/test.yml/badge.svg)](https://github.com/SpiekChat/Spiek.me-iOS-app/actions/workflows/test.yml)
-[![test count](https://img.shields.io/badge/SpiekCore_tests-159_passing-2b8a3e?style=flat-square)](#tests)
+[![test count](https://img.shields.io/badge/SpiekCore_tests-169_passing_incl._group_vectors_%2B_fuzzing-2b8a3e?style=flat-square)](#tests)
 [![platform](https://img.shields.io/badge/platform-iOS_17+_%C2%B7_SwiftUI-364fc7?style=flat-square)](#requirements)
 [![vectors](https://img.shields.io/badge/golden_vectors-byte--identical_with_Android-5f3dc4?style=flat-square)](https://github.com/SpiekChat/Spiek.me-Android-app)
 [![license](https://img.shields.io/badge/license-source--available-6a737d?style=flat-square)](LICENSE)
@@ -119,16 +119,23 @@ identical hex string, signatures included.
 
 ```bash
 cd SpiekCore && swift test
-# -> Executed 159 tests, with 0 failures
+# -> Executed 169 tests, with 0 failures
 ```
 
-159 XCTests on the pure-Swift package: golden vectors (hashes, phrase keys,
+169 XCTests on the pure-Swift package: golden vectors (hashes, phrase keys,
 WIF, addresses, pushData, signatures over SHA-256d, ECDH, AES-GCM, envelopes,
 codecs, complete built transactions), BIP-39, SNS and OpNS acceptance
 criteria, and engine scenarios (discovery, the `prev` chain, encryption
-switching on, edits, reactions, withdrawals, media, groups, payments). CI
-runs the same command on every push. Native UI/Keychain flows are covered by
-the on-device matrix in BUILD.md §12, not by XCTest yet.
+switching on, edits, reactions, withdrawals, media, groups, payments). Since
+1.20 the suite also carries `GroupVectorTests` — the encrypted-group cipher
+against `group_vectors.json`, ciphertexts produced by an independent
+AES-256-GCM implementation and shared verbatim with the web and Android
+suites, negatives included — and `FuzzTests`: thousands of deterministic
+mutations (bit flips, truncation, lying length prefixes, corrupted
+addresses, mutated group ciphertexts, malformed invite codes) against the
+real decoders. CI runs the same command on every push. Native UI/Keychain
+flows are covered by the on-device matrix in BUILD.md §12, not by XCTest
+yet.
 
 ## License
 

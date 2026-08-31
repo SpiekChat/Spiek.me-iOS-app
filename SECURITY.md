@@ -62,10 +62,17 @@ Spiek clients (report those against their own repositories, see the README).
   channels: parts of the AES and secp256k1 code are not constant-time. An
   independent audit is planned before Spiek is marketed as a "secure
   messenger"; until then treat it as a low-balance messaging wallet.
-- Direct messages are encrypted once the peer's key is known; **group chats
-  are not encrypted** and the app says so in the UI.
-- There is no forward secrecy: one long-term key protects the whole history.
-  Key separation and a ratchet are on the protocol-v2 roadmap.
+- Direct messages are encrypted once the peer's key is known. **Groups
+  created on the current generation are encrypted** under a 32-byte key that
+  travels in the invite (`spiek:group:<id>:<64-hex-key>`) — group privacy,
+  not end-to-end secrecy: everyone who ever holds the invite reads
+  everything, there is no member revocation, and the key is static for the
+  life of the group. Keyless invites and pre-existing groups remain **public
+  groups**, stored on-chain in the clear; the app says which kind you are in.
+- There is no forward secrecy: one long-term key protects a conversation's
+  whole history, and one group key protects a group's whole history. Key
+  rotation is under design as a protocol revision, together with the
+  independent audit.
 - The chain is permanent: edits and withdrawals change what clients display,
   never what is on-chain.
 

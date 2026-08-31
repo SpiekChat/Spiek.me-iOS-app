@@ -361,8 +361,10 @@ struct NewChatSheet: View {
     private struct Created: Identifiable {
         let channelId: String
         let kind: ChannelKind
+        /// v1.20: a fresh group's symmetric key, folded into the code.
+        var groupKey: String? = nil
         var id: String { channelId }
-        var code: String { InviteCode.encode(channelId: channelId, kind: kind) }
+        var code: String { InviteCode.encode(channelId: channelId, kind: kind, groupKey: groupKey) }
     }
 
     @State private var name = ""
@@ -407,7 +409,9 @@ struct NewChatSheet: View {
                         onClose: { dismiss() })
 
             Text(created.kind == .group
-                 ? "Share this code with the members. It is the only thing they need to join."
+                 ? (created.groupKey != nil
+                    ? "Share this code with the members — it holds the group key, so everyone with the invite can read the group. It is the only thing they need to join."
+                    : "Share this code with the members. It is the only thing they need to join.")
                  : "Send this code to the other person. It is the only thing they need to join.")
                 .font(.sans(13.5))
                 .foregroundStyle(Palette.muted)
@@ -462,7 +466,7 @@ struct NewChatSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 SheetHeader(title: "New chat", trailing: nil, onClose: { dismiss() })
 
-                Text("Create a chat and share its code — the other person loads it with that code. Nothing else to exchange. Note: group chats are not encrypted, and anyone with the code can read and write.")
+                Text("Create a chat and share its code — the other person loads it with that code. Nothing else to exchange. A new group is encrypted and its code carries the group key, so everyone with the invite can read; a keyless group code joins a public group, stored on-chain in the clear.")
                     .font(.sans(13.5))
                     .foregroundStyle(Palette.muted)
                     .padding(.bottom, 14)
@@ -542,8 +546,10 @@ struct NewChatSheet: View {
         let id = group ? await model.newGroup(name: name) : await model.newChat(name: name)
         guard let id else { return }
         // Show the code rather than jumping straight into the empty chat.
+        // v1.20: the fresh group's key travels inside the code.
+        let key = group ? model.channels.first(where: { $0.channelId == id })?.groupKey : nil
         withAnimation(.easeOut(duration: 0.2)) {
-            created = Created(channelId: id, kind: group ? .group : .dm)
+            created = Created(channelId: id, kind: group ? .group : .dm, groupKey: key)
         }
     }
 

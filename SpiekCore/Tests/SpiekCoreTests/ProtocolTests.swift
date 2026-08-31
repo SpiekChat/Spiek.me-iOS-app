@@ -126,6 +126,18 @@ final class CodecTests: XCTestCase {
 
         XCTAssertNil(InviteCode.decode("spiek:chat:nothex"))
         XCTAssertNil(InviteCode.decode("https://example.com"))
+
+        // v1.20, encrypted groups: the key rides as a fourth segment.
+        let key = String(repeating: "cd", count: 32)
+        XCTAssertEqual(InviteCode.encode(channelId: channelId, kind: .group, groupKey: key),
+                       "spiek:group:\(channelId):\(key)")
+        let keyed = try XCTUnwrap(InviteCode.decode("spiek:group:\(channelId):\(key)"))
+        XCTAssertEqual(keyed.groupKey, key)
+        XCTAssertEqual(keyed.kind, .group)
+        XCTAssertNil(InviteCode.decode("spiek:chat:\(channelId):\(key)"), "a dm code cannot carry a key")
+        XCTAssertNil(InviteCode.decode("spiek:group:\(channelId):abcd"), "a short key is rejected")
+        XCTAssertNil(InviteCode.decode("spiek:group:\(channelId):" + String(repeating: "gg", count: 32)),
+                     "a non-hex key is rejected")
     }
 
     func testChannelAddressDerivation() throws {

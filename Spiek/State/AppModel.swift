@@ -732,7 +732,10 @@ final class AppModel {
             return nil
         }
         return await withEngine { engine in
-            let id = try await engine.openChat(name: nil, kind: decoded.kind, channelId: decoded.channelId)
+            let id = try await engine.openChat(name: nil,
+                                               kind: decoded.kind,
+                                               channelId: decoded.channelId,
+                                               groupKey: decoded.groupKey)
             _ = try await engine.pollOnce()
             await self.reload()
             return id
@@ -1365,10 +1368,145 @@ final class AppModel {
         let replyRef = replyingTo.flatMap { Hex.decode($0.record.txid)?.reversedBytes }
         replyingTo = nil
         draft = ""
+        // v1.20: optimistic echo — the bubble appears the moment send is
+        // tapped; a poll holding the engine can no longer delay it. reload()
+        // rebuilds the list, replacing this synthetic row with the real record
+        // (or clearing it when sending failed).
+        appendOptimistic(channelId: activeChannelId, text: text)
         await send(.init(op: .msg,
                          payload: Codecs.encodeText(text),
                          ref: replyRef),
                    to: activeChannelId)
+    }
+
+    /// v1.20: a synthetic pending row shown until `reload()` brings the real record.
+    private func appendOptimistic(channelId: String, text: String) {
+        guard activeChannelId == channelId,
+              let kind = channels.first(where: { $0.channelId == channelId })?.kind else { return }
+        let record = MessageRecord(txid: "optimistic-\(UInt64(Date().timeIntervalSince1970 * 1_000_000))",
+                                   channel: channelId,
+                                   sender: myHash,
+                                   senderPub: "",
+                                   senderAddress: "",
+                                   kind: kind,
+                                   op: .msg,
+                                   time: Int(Date().timeIntervalSince1970),
+                                   // After every persisted sort key, so the bubble sits at the bottom.
+                                   sort: .greatestFiniteMagnitude,
+                                   status: .pending,
+                                   mine: true)
+        messages.append(ViewMessage(record: record,
+                                    viewOp: .msg,
+                                    viewPayload: Codecs.encodeText(text),
+                                    encrypted: false,
+                                    unreadable: false))
+    }
+
+    // MARK: BSV21 tokens (v1.20)
+
+    /// One BSV21 balance row, straight from the shared token-index contract.
+    struct TokenBalance: Identifiable, Equatable {
+        let id: String
+        let sym: String
+        let amount: String
+        let dec: Int
+        let status: String
+
+        /// `amount` scaled by `dec` without ever leaving integer math.
+        var display: String {
+            let negative = amount.hasPrefix("-")
+            var digits = amount
+            if negative || amount.hasPrefix("+") { digits = String(amount.dropFirst()) }
+            guard !digits.isEmpty, digits.allSatisfy(\.isNumber) else { return amount }
+            func grouped(_ text: String) -> String {
+                var out = [Character](); var count = 0
+                for character in text.reversed() {
+                    if count != 0 && count % 3 == 0 { out.append(",") }
+                    out.append(character); count += 1
+                }
+                return String(out.reversed())
+            }
+            guard dec > 0, dec <= 36 else { return (negative ? "-" : "") + grouped(digits) }
+            let padded = String(repeating: "0", count: max(0, dec + 1 - digits.count)) + digits
+            let whole = String(padded.dropLast(dec))
+            var frac = String(padded.suffix(dec))
+            while frac.hasSuffix("0") { frac = String(frac.dropLast()) }
+            return (negative ? "-" : "") + grouped(whole) + (frac.isEmpty ? "" : "." + frac)
+        }
+    }
+
+    enum TokenSection: Equatable {
+        case off
+        case loading
+        case unreachable
+        case loaded([TokenBalance])
+    }
+
+    var tokenSection: TokenSection = .off
+
+    /// Fetches BSV21 balances from the configured token index —
+    /// `GET {base}/address/{address}/balance` per the shared indexer contract.
+    /// Display-only: amounts stay strings, and an unreachable index hides the
+    /// section without losing anything (the tokens live on the chain).
+    func refreshTokens() async {
+        var base = settings.tokenURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        while base.hasSuffix("/") { base = String(base.dropLast()) }
+        guard !base.isEmpty, settings.mode == .node, !myHash.isEmpty,
+              let hashBytes = Hex.decode(myHash), hashBytes.count == 20 else {
+            tokenSection = .off
+            return
+        }
+        let address = Address.encode(hash160: hashBytes)
+        guard let url = URL(string: "\(base)/address/\(address)/balance") else {
+            tokenSection = .off
+            return
+        }
+        tokenSection = .loading
+        var request = URLRequest(url: url, timeoutInterval: 10)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                tokenSection = .unreachable
+                return
+            }
+            guard let balances = Self.parseTokenBalances(data) else {
+                tokenSection = .unreachable
+                return
+            }
+            tokenSection = .loaded(balances)
+        } catch {
+            tokenSection = .unreachable
+        }
+    }
+
+    private static func parseTokenBalances(_ data: Data) -> [TokenBalance]? {
+        let parsed = try? JSONSerialization.jsonObject(with: data)
+        let items: [[String: Any]]
+        if let array = parsed as? [[String: Any]] {
+            items = array
+        } else if let object = parsed as? [String: Any] {
+            items = (object["balances"] as? [[String: Any]]) ?? (object["tokens"] as? [[String: Any]]) ?? []
+        } else {
+            return nil
+        }
+        func text(_ item: [String: Any], _ keys: [String]) -> String? {
+            for key in keys {
+                if let value = item[key] as? String, !value.isEmpty { return value }
+                if let value = item[key] as? NSNumber { return value.stringValue }
+            }
+            return nil
+        }
+        return items.prefix(50).map { item in
+            let id = text(item, ["id", "tokenId"]) ?? ""
+            let symRaw = text(item, ["sym", "tick", "symbol"]).map { String($0.prefix(12)) }
+            let fallback = id.count > 8 ? String(id.prefix(8)) + "…" : "token"
+            return TokenBalance(id: id,
+                                sym: (symRaw?.isEmpty == false ? symRaw! : fallback),
+                                amount: text(item, ["amount", "balance", "confirmed"]) ?? "0",
+                                dec: (item["dec"] as? Int) ?? (item["decimals"] as? Int) ?? 0,
+                                status: (text(item, ["status", "validity"]) ?? "").lowercased())
+        }
     }
 
     /// Coins straight to an address — no chat, no on-chain record.
@@ -1557,6 +1695,9 @@ final class AppModel {
             await reload()
         } catch {
             report(error)
+            // The reload also clears any optimistic bubble for a message that
+            // never made it into the store.
+            await reload()
         }
     }
 

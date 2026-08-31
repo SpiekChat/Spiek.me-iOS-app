@@ -20,6 +20,7 @@ struct WalletView: View {
                 hero
                 SectionHeader(title: "Names")
                 namesEntry
+                tokensSection
                 SectionHeader(title: "Activity")
                 activityList
                 runway
@@ -29,6 +30,8 @@ struct WalletView: View {
         .refreshable { await model.refresh() }
         .task { await loadActivity() }
         .task { await model.loadMyNames() }
+        // v1.20: BSV21 balances, refreshed on entry when a token index is set.
+        .task { await model.refreshTokens() }
         .onChange(of: model.balance) { _, _ in Task { await loadActivity() } }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -152,6 +155,45 @@ struct WalletView: View {
         .background(Palette.ink)
     }
 
+    // MARK: BSV21 tokens (v1.20) — display-only, hidden without an index.
+
+    @ViewBuilder
+    private var tokensSection: some View {
+        switch model.tokenSection {
+        case .off:
+            EmptyView()
+        case .loading:
+            SectionHeader(title: "Tokens")
+            Text("checking the token index…")
+                .font(.sans(14))
+                .foregroundStyle(Palette.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+        case .unreachable:
+            SectionHeader(title: "Tokens")
+            Text("Token index unreachable — balances hidden, nothing is lost.")
+                .font(.sans(14))
+                .foregroundStyle(Palette.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+        case .loaded(let balances):
+            SectionHeader(title: "Tokens")
+            if balances.isEmpty {
+                Text("No BSV21 tokens on this address.")
+                    .font(.sans(14))
+                    .foregroundStyle(Palette.muted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+            } else {
+                GroupedList {
+                    ForEach(balances) { token in
+                        TokenRow(token: token)
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: Activity
 
     @ViewBuilder
@@ -218,6 +260,34 @@ struct WalletView: View {
         } catch {
             model.report(error)
         }
+    }
+}
+
+struct TokenRow: View {
+    let token: AppModel.TokenBalance
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(token.sym)
+                    .font(.sans(14.5, weight: .semibold))
+                    .foregroundStyle(Palette.body)
+                let idPart = token.id.count > 14 ? String(token.id.prefix(14)) + "…" : token.id
+                let statusPart = (!token.status.isEmpty && token.status != "valid") ? token.status : nil
+                let sub = [idPart.isEmpty ? nil : idPart, statusPart].compactMap { $0 }.joined(separator: " · ")
+                if !sub.isEmpty {
+                    Text(sub)
+                        .font(.mono(11))
+                        .foregroundStyle(Palette.stamp)
+                }
+            }
+            Spacer()
+            Text(token.display)
+                .font(.mono(13))
+                .foregroundStyle(Palette.body)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 

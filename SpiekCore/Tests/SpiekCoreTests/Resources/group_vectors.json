@@ -1,0 +1,125 @@
+{
+  "format": "spiek group encryption vectors v1",
+  "cipher": "AES-256-GCM, wire = IV(32) ‖ ciphertext ‖ tag(16), IV longer than 96 bits is expanded to J0 per the GCM specification",
+  "plaintext": "canonical inner record: pushdata(version=2) ‖ pushdata(op) ‖ pushdata(payload) [‖ pushdata(ref)] — the exact bytes the EMSG envelope carries",
+  "generator": "tests/make-group-vectors.mjs (Node/OpenSSL — independent of all three clients)",
+  "vectors": [
+    {
+      "name": "group_msg_ascii",
+      "note": "plain text message in an encrypted group",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "c742879376dc38d2b5d2c5b9fdc5fdecc30ec57841ec341616d855ad0f6cf9767ab1d26048b5ab20d6806ec82d98a3279806b9e592589832145d9c7fdf372d7573ddba23a46fdd0b631c99672ebe378d0293e7e7df05b46a3e0ac2ad31e6f13af522c7",
+      "expect": {
+        "version": 2,
+        "op": 1,
+        "payload": "686f692067726f657020e280942064697420626c696a66742062696e6e656e206465207569746e6f646967696e67"
+      }
+    },
+    {
+      "name": "group_msg_utf8",
+      "note": "message with multi-byte UTF-8 (emoji + accents)",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "7030d73339cd7c8210cb037395543f28c80f23682ed33a943396ad8a5171c9b1f9397763cea90c4ebdbac51fc7eb6dadf649dbae5a01b698e0210ca47cbbcecdf5bdca83c65a0e905357004c8fab9fad039a2c0384",
+      "expect": {
+        "version": 2,
+        "op": 1,
+        "payload": "636166c3a920e2989520e2809420f09f94902067726f657073736c657574656c"
+      }
+    },
+    {
+      "name": "group_msg_empty",
+      "note": "empty payload is legal for MSG",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "83ebf4d133f674a342e140296d2aac275bef0619980ec95526da3fa9399677f8a3cdc49dc9941a8c4273ed99123f3408563dd1efae",
+      "expect": {
+        "version": 2,
+        "op": 1,
+        "payload": ""
+      }
+    },
+    {
+      "name": "group_react",
+      "note": "reaction carries a 32-byte ref (little-endian txid)",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "829766095fbb0a4ba16dc69957a04becf71f2b11df89bac6e91cdd34cfbc3e647ec7cd733ebff5fea5f8095cdf53bf6c674c0d334159fe51c79c8ce5983c07084de40bd8c24cd698bbb20f8bd8c95eccf162567427b4c13c7be2",
+      "expect": {
+        "version": 2,
+        "op": 3,
+        "payload": "f09f998c",
+        "ref": "59af7e8e0f25cfe66fbc79a54713cc44e0c5e67de2d2756be846f14d147d7437"
+      }
+    },
+    {
+      "name": "group_edit",
+      "note": "edit carries new text plus the ref of the original",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "0532a2aea9173d73de0ec0fab47cdfb6ed47ad3110d4130d9a20ead1fcd99c503c5c6e12fe9eb481ce2376b6992a7f10aefe32cadb7cbf112309f683ab69629de210b43fb60df7c26938c3b86516cf60169aed27bdfc6f0154503dd2f5297b1d3a46416f80904d10f05fc7d4b3",
+      "expect": {
+        "version": 2,
+        "op": 4,
+        "payload": "65646974656420696e73696465207468652067726f7570",
+        "ref": "b1f370ef3fce65916c385cd8c3f126b22fc301fae78470e36ac61b8c6ac4c5df"
+      }
+    },
+    {
+      "name": "group_del",
+      "note": "withdraw (DEL): empty payload, ref required",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "8b0872537b544b109de91ba5cf29e7debee8a8030830a16b9b5f5e1940670a1eb2faea56ac361cfdd6e0416a81e37988b308ae8af06710fd707f083647b44b580e638906251790fa2aeb009aa2fb928991cf7b3c36b2",
+      "expect": {
+        "version": 2,
+        "op": 5,
+        "payload": "",
+        "ref": "03f6acbfd9911c8990daab85b97589fb4d94258a9860758efbb5163a200668c6"
+      }
+    },
+    {
+      "name": "group_media",
+      "note": "media pointer record under the group key",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "f71e35206a23ad0247787b913116bb30a3e266b5baf8fde27e0c4e04bc5dc626b355a0f6119962014da36323439f25b7f4c1a1eb01523960248428c10874412c3467237d7cb43af296ef456e568d77dbcf3d0975053ef0b2f664d88a3619c195ac4759a5888d87cdf44a0767aa72e2d4552eafc03414032b21bb1696bb7843c137382793dc575ee7f842504e58f7b014da75e898f107",
+      "expect": {
+        "version": 2,
+        "op": 2,
+        "payload": "3fb0651a5a88887e880b40887e3d68a8d92f1ce14db64b13f52d0b1c394cdff8a18171b399eeb47b35c157530769113cae180f281c796d86a4b027dd01c249b77e5ab5076eabe4fb8f8004493c94d7724b7b2a88ee238fa83fc3303c56d77f4b"
+      }
+    },
+    {
+      "name": "group_msg_long",
+      "note": "payload above one pushdata-75 boundary (200 bytes)",
+      "key": "19f3a2f9d5e4b6e25d6c3a2832c601c0658a3043a189daf304e98fcb5c97e073",
+      "ciphertext": "7ae854ee41d18b69f9e36b6fbc2e2081f0a0adf0d32f7ee56ef36f1fda44c067ed7935c747717eae8486f444d9e86549f5ba4fe78413dabaeb21bd1916a05de0ed741442256db5ed091025e9b0ee03912391f8da7cd432ad773569a32198ececf3ecab97835980e72e9c1e3fe1b46f425c77a442f5eae799d950dbf1a3348f78673d7bf69308ebc7777014888d00ab7ac6587761762adeed575b2ece2e28ca4dbed35fe71691729d7962b02be1842b2e7fc1c80bba9bb5b965ef996f0beb1d967310c9f62faae27268192107b2ec37390670975656de91baf9d7aa62f666cf0651df908b3bab22d59f068c4bf484efedf6f440fca861fb1f6120fef912f4",
+      "expect": {
+        "version": 2,
+        "op": 1,
+        "payload": "8c6e5b32f9b50926bd0fc344fada04b74e3c96f4f861356d273f8e670bb1080a00a4bdf89a9764853e56015ffb30ea177853f05b4e469310baabe348aea75ab7c6925da6b1bba945688ff370c41e021e445d3ff8ebf128ffe86a1920bdea5ac9858de887c8a273f9330dd654c32a52bdbd1c8c739e59b39f88a8b94738672a723e116e9e03ac6c4255368c4ecb19778f918211c3a54c41127c0e9a6e3e118492e74b0bb9f5668671b8bba161943426a12cec479ea97140b75935695460ce313fe8e0ae6411c8e364"
+      }
+    }
+  ],
+  "negatives": [
+    {
+      "name": "neg_wrong_key",
+      "note": "decrypting with a different 32-byte key must fail",
+      "key": "19f3a2f9d5e4b6e25d6c3a2832c601c0658a3043a189daf304e98fcb5c97e073",
+      "ciphertext": "2edf9c4742f80486fd9bac5f4ef557821cdb0ce6b2919f528556c3385e5db2c31d96f9b481ef399dff1cd7ff0253f9f301fe45b64cc7ee701ad738a60803b5560225"
+    },
+    {
+      "name": "neg_flipped_tag",
+      "note": "a single flipped tag bit must fail authentication",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "2edf9c4742f80486fd9bac5f4ef557821cdb0ce6b2919f528556c3385e5db2c31d96f9b481ef399dff1cd7ff0253f9f301fe45b64cc7ee701ad738a60803b5560224"
+    },
+    {
+      "name": "neg_truncated",
+      "note": "a truncated blob must be rejected",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "2edf9c4742f80486fd9bac5f4ef557821cdb0ce6b2919f528556c3385e5db2c31d96f9b481ef399dff1cd7ff0253f9f301fe45b64cc7ee701ad738a60803b55602"
+    },
+    {
+      "name": "neg_too_short",
+      "note": "shorter than IV+tag (48 bytes) is structurally invalid",
+      "key": "9e739ddd73ddb4f8fada38420a8f9a6144fa2d5e535bc9f79a7f6d8e9fd5e70e",
+      "ciphertext": "60f66cea42f924519e6a3c9798a06a4c4f40fb9248a3be82f55d2299d0a0cfd194c33f9dbe228e27"
+    }
+  ]
+}
