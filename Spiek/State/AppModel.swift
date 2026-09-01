@@ -1382,7 +1382,16 @@ final class AppModel {
     /// v1.20: a synthetic pending row shown until `reload()` brings the real record.
     private func appendOptimistic(channelId: String, text: String) {
         guard activeChannelId == channelId,
-              let kind = channels.first(where: { $0.channelId == channelId })?.kind else { return }
+              let channel = channels.first(where: { $0.channelId == channelId }) else { return }
+        let kind = channel.kind
+        // Show the lock the real record will get, so the bubble does not flash
+        // "unencrypted" for a second in an encrypted chat.
+        let willEncrypt: Bool
+        switch kind {
+        case .group: willEncrypt = channel.groupKey != nil
+        case .note: willEncrypt = !channel.plain
+        case .dm: willEncrypt = channel.peerPub != nil && !channel.plain
+        }
         let record = MessageRecord(txid: "optimistic-\(UInt64(Date().timeIntervalSince1970 * 1_000_000))",
                                    channel: channelId,
                                    sender: myHash,
@@ -1398,7 +1407,7 @@ final class AppModel {
         messages.append(ViewMessage(record: record,
                                     viewOp: .msg,
                                     viewPayload: Codecs.encodeText(text),
-                                    encrypted: false,
+                                    encrypted: willEncrypt,
                                     unreadable: false))
     }
 

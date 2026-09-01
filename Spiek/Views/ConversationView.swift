@@ -143,7 +143,10 @@ struct ConversationView: View {
                     }
                 }
             } else {
-                model.copyToPasteboard(channel.inviteCode, label: "Chat code")
+                // v1.20.1: keyed group invites are secrets (local-only, expiring).
+                model.copyToPasteboard(channel.inviteCode,
+                                       label: channel.kind == .group ? "Group code" : "Chat code",
+                                       sensitive: channel.kind == .group && channel.groupKey != nil)
             }
         } label: {
             VStack(spacing: 1) {

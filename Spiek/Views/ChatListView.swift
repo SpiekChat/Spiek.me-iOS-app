@@ -49,7 +49,9 @@ struct ChatListView: View {
                             }
                             if channel.kind != .note {
                                 Button {
-                                    model.copyToPasteboard(channel.inviteCode, label: "Chat code")
+                                    model.copyToPasteboard(channel.inviteCode,
+                                                           label: channel.kind == .group ? "Group code" : "Chat code",
+                                                           sensitive: channel.kind == .group && channel.groupKey != nil)
                                 } label: {
                                     Label("Copy chat code", systemImage: "doc.on.doc")
                                 }
@@ -191,6 +193,10 @@ struct ChatRow: View {
         }
         if channel.peerPub == nil && channel.kind == .dm {
             return "Waiting for their first message"
+        }
+        // v1.20.1: never print a keyed group's invite (= its key) in the list.
+        if channel.kind == .group, channel.groupKey != nil {
+            return "Encrypted group — share the code from the chat"
         }
         return channel.inviteCode
     }

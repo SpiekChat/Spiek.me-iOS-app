@@ -178,8 +178,10 @@ errors included — there is not one `UIAlertController` in the app.
   earlier build stay readable — they are plain records and are shown as such.
 - **Safety numbers.** In an encrypted one-to-one, tapping the header opens the
   five-group fingerprint of both keys, to read aloud over another channel.
-  Groups say "not encrypted" in the header instead of leaving the missing lock
-  icon to imply privacy.
+  Since 1.20 a group's header says which kind it is — *encrypted group ·
+  everyone with the invite can read* (key in the invite) or *public group ·
+  permanently stored on-chain* — instead of leaving the missing lock icon to
+  imply anything.
 - **Device lock.** *You → Security* can require Face ID, Touch ID **or the
   device passcode** — whichever the phone has — to open the app, and to reveal
   the recovery phrase or the WIF key. The lock comes up when the app leaves the
@@ -301,10 +303,15 @@ advice — have it checked if you are unsure.
 
 ### 7.3 Privacy
 
-`Spiek/PrivacyInfo.xcprivacy` is filled in: no tracking, no collected data, and
-the two required-reason APIs the app touches (file timestamps for SQLite's WAL,
-disk space for the media cache) are declared. Under "App Privacy" in App Store
-Connect you can therefore select **Data Not Collected**.
+`Spiek/PrivacyInfo.xcprivacy` is filled in: no tracking, and the two
+required-reason APIs the app touches (file timestamps for SQLite's WAL, disk
+space for the media cache) are declared. The manifest and the App Store
+privacy label are different things: the manifest's empty collected-data
+array does **not** make "Data Not Collected" correct. Messages, media and
+profiles leave the device for the public chain, the wallet address goes to
+the endpoints it watches (and to a BSV21 token index if configured), and
+reports go by e-mail. Declare the label from the data map in SECURITY.md —
+Apple requires in-app messaging under "Emails or Text Messages".
 
 ### 7.4 What reviewers will ask
 
@@ -543,10 +550,13 @@ need to relaunch.
 
 ## 12. Version history
 
-Marketing version and build number now track the release number: v17 ships as
-**1.17.0 (build 17)**. The next planned release is **v18 (1.18.0)**.
+Marketing version and build number track the release number: this build
+ships as **1.20.1 (build 21)** — see [CHANGELOG.md](CHANGELOG.md) for 1.20.0
+(encrypted groups, BSV21 balances, fuzzing) and 1.20.1 (keyed invites as
+secrets, documentation corrections). The notes below are the v17 review
+round, kept for history.
 
-### v17 — 1.17.0 (this release)
+### v17 — 1.17.0
 
 Pre-release review fixes, wallet correctness first:
 

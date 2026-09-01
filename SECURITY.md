@@ -54,6 +54,29 @@ the public data sources (the `spiek.me` endpoints, WhatsOnChain, the SNS and
 OpNS indexes), social-engineering scenarios, and the other
 Spiek clients (report those against their own repositories, see the README).
 
+## Data map (what leaves the device, and where)
+
+Spiek has no tracking, no analytics and no server of its own, but it is not
+"no data collected": user content and identifiers leave the device for the
+app to work. Store privacy labels, the privacy policy and this document
+describe the same flows, from this table.
+
+| Flow | Goes to | Readable by | Persistence | Store category |
+| --- | --- | --- | --- | --- |
+| Direct-message text | broadcast endpoint → miners → chain | encrypted once the peer's key is known; metadata (sender, channel, time, size) public | permanent | Messages |
+| Keyless / public group | chain | everyone | permanent | Messages / user content |
+| Encrypted group (key in the invite) | chain | everyone who holds the invite; metadata public | permanent | Messages / user content |
+| Images | chain (1Sat inscription) | **everyone** — image bytes are public in every chat kind; only the pointer record is encrypted | permanent | Photos |
+| Profile name / bio | chain | everyone | permanent | User content |
+| Payments | chain | everyone (pseudonymous) | permanent | Financial / transactions |
+| Wallet address | address-watch, UTXO and transaction endpoints; a BSV21 token index **if you configure one** | endpoint operators (pseudonymous, plus IP and request metadata) | per endpoint's logging | Identifiers |
+| Name lookups (SNS / OpNS) | resolver endpoints | endpoint operators | per endpoint's logging | — |
+| Reports and support | e-mail to the operator | the operator | mailbox retention | Customer support |
+
+Nothing else is sent. The recovery phrase, private key and decrypted
+message cache never leave the device. "Deletion" can wipe local data and
+off-chain support data; chain records are permanent by construction.
+
 ## Known limitations (documented, deliberate)
 
 - All cryptography is implemented in-repo with no external crypto
@@ -80,5 +103,5 @@ Spiek clients (report those against their own repositories, see the README).
 
 ```bash
 cd SpiekCore && swift test
-# -> Executed 159 tests, with 0 failures
+# -> Executed 169 tests, with 0 failures
 ```

@@ -10,6 +10,31 @@ Full build notes, design decisions and the on-device test matrix live in
 
 ---
 
+## [1.20.1] — 2026-09-01 (build 21) — keyed invites handled as secrets
+
+### Security
+
+- **A keyed group invite is the group key, and is now treated as one.**
+  Copying it (created sheet, chat header, chat list) uses the sensitive
+  pasteboard path — local only, so it never rides Universal Clipboard, and
+  it expires after a minute — and the chat list no longer prints a keyed
+  group's code as its preview line. Sharing through the share sheet is
+  unchanged: that is the deliberate act the key is for.
+
+### Fixed
+
+- The optimistic pending bubble now shows the lock a message will get
+  (encrypted DM, note, keyed group) instead of appearing unencrypted for a
+  second.
+- Documentation: the App Store section still said 1.17.0/build 17 and "Data
+  Not Collected"; BUILD.md still said groups are not encrypted; the
+  requirements said Xcode 16 (uploads need Xcode 26 since 28 April 2026);
+  the README claimed `spiek:` codes open the app directly (no URL scheme is
+  registered, on purpose). All corrected; "serverless" clarified and the
+  encryption claim scoped.
+
+---
+
 ## [1.20.0] — 2026-08-23 (build 20) — encrypted groups, BSV21 balances, fuzzing
 
 Builds 18 and 19 were internal steps toward this release and never shipped;

@@ -435,7 +435,12 @@ struct NewChatSheet: View {
                         .squareEdge(Palette.border)
                 }
                 Button("Copy code") {
-                    model.copyToPasteboard(created.code, label: "Chat code")
+                    // v1.20.1: a keyed group code *is* the group key — local
+                    // pasteboard only (no Universal Clipboard), expires after
+                    // a minute.
+                    model.copyToPasteboard(created.code,
+                                           label: created.kind == .group ? "Group code" : "Chat code",
+                                           sensitive: created.groupKey != nil)
                 }
                 .buttonStyle(SolidButtonStyle(font: .display(14), verticalPadding: 13))
             }

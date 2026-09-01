@@ -1,4 +1,4 @@
-# Spiek.me — iOS app (v1.20.0)
+# Spiek.me — iOS app (v1.20.1)
 
 [![SpiekCore tests](https://github.com/SpiekChat/Spiek.me-iOS-app/actions/workflows/test.yml/badge.svg)](https://github.com/SpiekChat/Spiek.me-iOS-app/actions/workflows/test.yml)
 [![test count](https://img.shields.io/badge/SpiekCore_tests-169_passing_incl._group_vectors_%2B_fuzzing-2b8a3e?style=flat-square)](#tests)
@@ -12,6 +12,13 @@ entire UI is SwiftUI, and `SpiekCore` is a dependency-free Swift package
 that reimplements the protocol, crypto, wallet and engine from scratch. No
 WebView, no JavaScript, no third-party code.
 
+"Serverless" means there is no central message or account database of
+Spiek's own: the clients talk to replaceable blockchain and index endpoints
+(broadcast, transaction lookup, address watching, name resolution, an
+optional BSV21 token index) and would not work without *some* such endpoint
+being reachable. Which endpoints, and what they see, is documented under
+Endpoints and in SECURITY.md.
+
 On the protocol layer: `SpiekCore/Tests/SpiekCoreTests/Resources/vectors.json`
 is **byte-identical to the Android app's copy** and was generated from the
 web client's JavaScript. Transactions built here are byte-for-byte what the
@@ -20,7 +27,8 @@ three.
 
 ## Requirements
 
-- Xcode 16 or newer (the project uses filesystem-synchronized groups)
+- Xcode 26 or newer (App Store uploads require the iOS 26 SDK since
+  28 April 2026; the project uses filesystem-synchronized groups)
 - macOS Sonoma 14.5 or newer
 - iOS 17.0+ (iPhone; iPad rotates freely)
 - Apple Developer account to run on a device — an **organization**
@@ -53,11 +61,15 @@ three.
 
 - **BIP-39 keys** — twelve words, `m/44'/236'/0'/0/0`; pre-BIP-39 phrases
   fall back to the legacy scheme automatically.
-- **Chats** — one-to-one, groups and notes-to-self; `spiek:chat:…` codes
-  also open the app directly.
+- **Chats** — one-to-one, groups and notes-to-self; paste a `spiek:chat:…`
+  or `spiek:group:…` code into *New chat* to join (the app registers no URL
+  scheme, on purpose: nothing external can trigger a paid `open`).
 - **Encryption** — direct messages encrypt as soon as the peer's key is
   known; peer key pinned only when it signed the record that announces it;
-  per-chat lock; safety number.
+  per-chat lock; safety number. Groups created since 1.20 are encrypted
+  under a key that travels in the invite (group privacy, not end-to-end
+  secrecy); keyless groups are public. Image bytes and all metadata are
+  public in every case.
 - **Device lock** — Face ID / Touch ID / passcode guards the key, not just
   the screen.
 - **Notifications** — local only, count only, never message text.
@@ -87,9 +99,15 @@ identical hex string, signatures included.
 
 ## App Store submission
 
-- Version: **1.17.0 (build 17)** — see [CHANGELOG.md](CHANGELOG.md)
-- `Spiek/PrivacyInfo.xcprivacy` present (no tracking, no data collection;
-  required-reason APIs C617.1 and E174.1 declared) → "Data Not Collected"
+- Version: **1.20.1 (build 21)** — see [CHANGELOG.md](CHANGELOG.md)
+- `Spiek/PrivacyInfo.xcprivacy` present (no tracking; required-reason APIs
+  C617.1 and E174.1 declared). The App Store privacy label is **not** "Data
+  Not Collected": Spiek has no tracking and no analytics, but messages,
+  media and profiles leave the device for the public chain (public or
+  encrypted as documented), the wallet address goes to the endpoints it
+  watches and, if configured, to a BSV21 token index, and reports go by
+  e-mail. Apple requires in-app messaging to be declared under "Emails or
+  Text Messages"; fill the label from the data map in SECURITY.md
 - Export compliance: `ITSAppUsesNonExemptEncryption = true` on purpose —
   Spiek ships its own AES-256-GCM; see [BUILD.md](BUILD.md) §7.2 for the ERN
   and self-classification steps
