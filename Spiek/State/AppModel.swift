@@ -339,6 +339,8 @@ final class AppModel {
     func bootstrap() async {
         Typeface.register()
         do {
+            // v1.21 (P0.5): finish a quarantine a crash interrupted before opening.
+            StoreQuarantine.recoverInterrupted(liveDatabase: Store.defaultURL())
             let store = try Store(url: Store.defaultURL())
             self.store = store
 
@@ -446,6 +448,26 @@ final class AppModel {
                                 dust: settings.dust,
                                 feePerByte: settings.feePerByte)
 
+            // v1.21 (P0.5): the durable store must belong to this wallet before
+            // anything reads it. A mismatch is quarantined under an opaque name
+            // and a fresh store takes its place — never rendered, never merged.
+            var store = store
+            if mode != .demo {
+                let fingerprint = StoreOwnership.fingerprint(compressedPublicKey: key.publicKey.compressedBytes)
+                let ownHash = key.publicKey.hash160.hex
+                let verdict = try await StoreOwnership.verify(store: store, fingerprint: fingerprint, ownHash: ownHash)
+                if verdict == .mismatch {
+                    await store.close()
+                    StoreQuarantine.quarantine(liveDatabase: Store.defaultURL())
+                    let fresh = try Store(url: Store.defaultURL())
+                    _ = try await StoreOwnership.verify(store: fresh, fingerprint: fingerprint, ownHash: ownHash)
+                    try await fresh.putMeta(key: "settings", value: settings)
+                    store = fresh
+                    self.store = fresh
+                    show("This device held chat data of another wallet. It was set aside unread — see You → Orphaned data to delete it.")
+                }
+            }
+
             let adapter: any ChainAdapter
             switch mode {
             case .demo:
@@ -468,6 +490,8 @@ final class AppModel {
 
             engine = next
             currentAccount = account
+            // v1.21 (P0.2): terms/report state and the signed moderation feed.
+            Task { await loadTrustState(); await refreshModerationFeed() }
             address = next.address
             publicKeyHex = next.publicKeyHex
             myHash = next.hashHex
@@ -1350,6 +1374,24 @@ final class AppModel {
     // MARK: Sending
 
     func sendDraft() async {
+        // v1.21 (P0.2/P0.3): terms first, then — for a public group — the one-time
+        // "permanent and public" disclosure, then the actual send.
+        guard let channelId = activeChannelId else { return }
+        let channel = channels.first { $0.channelId == channelId }
+        let isPublicGroup = channel?.kind == .group && channel?.groupKey == nil
+        requireTerms { [weak self] in
+            guard let self else { return }
+            Task {
+                if isPublicGroup {
+                    await self.requireDisclosure("publicGroup") { Task { await self.sendDraftNow() } }
+                } else {
+                    await self.sendDraftNow()
+                }
+            }
+        }
+    }
+
+    private func sendDraftNow() async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let activeChannelId else { return }
 
@@ -1409,6 +1451,162 @@ final class AppModel {
                                     viewPayload: Codecs.encodeText(text),
                                     encrypted: willEncrypt,
                                     unreadable: false))
+    }
+
+    // MARK: Trust & Safety (v1.21, P0.2)
+
+    struct ReportEntry: Codable, Identifiable, Equatable {
+        let id: String
+        let token: String
+        let category: String
+        var status: String
+        let at: Int
+    }
+
+    var reportLog: [ReportEntry] = []
+    var termsAccepted = false
+    var pendingTermsAction: (() -> Void)?
+    var pendingDisclosure: (topic: String, action: () -> Void)?
+    var feedStatus = "no feed accepted"
+
+    private var moderationBase: String {
+        var base = settings.moderationURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        while base.hasSuffix("/") { base = String(base.dropLast()) }
+        return base
+    }
+
+    private func httpJSON(_ method: String, _ url: String, body: [String: Any]? = nil, token: String? = nil) async -> (Int, [String: Any]) {
+        guard let target = URL(string: url) else { return (0, [:]) }
+        var request = URLRequest(url: target, timeoutInterval: 10)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let token { request.setValue(token, forHTTPHeaderField: "X-Status-Token") }
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        }
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+            return (code, json)
+        } catch {
+            return (0, [:])
+        }
+    }
+
+    func loadTrustState() async {
+        guard let store else { return }
+        termsAccepted = await Moderation.termsAccepted(store)
+        reportLog = (try? await store.meta([ReportEntry].self, key: Moderation.reportsKey)) ?? []
+        if let feed = try? await Moderation.accepted(store) {
+            feedStatus = "feed seq \(feed.seq), \(feed.entries.count) entries, expires \(feed.expiresAt.prefix(10))"
+        } else {
+            feedStatus = "no feed accepted"
+        }
+    }
+
+    /// Terms & Community Standards must be accepted before the first post (blocking).
+    func requireTerms(_ action: @escaping () -> Void) {
+        if termsAccepted || settings.mode == .demo { action() } else { pendingTermsAction = action }
+    }
+
+    func acceptTerms() async {
+        guard let store else { return }
+        try? await Moderation.acceptTerms(store)
+        termsAccepted = true
+        let action = pendingTermsAction
+        pendingTermsAction = nil
+        action?()
+    }
+
+    /// P0.3: one specific warning before the first public-group post / media upload.
+    func requireDisclosure(_ topic: String, _ action: @escaping () -> Void) async {
+        guard let store else { action(); return }
+        if await Moderation.disclosed(store, topic: topic) { action() } else { pendingDisclosure = (topic, action) }
+    }
+
+    func confirmDisclosure() async {
+        guard let store, let pending = pendingDisclosure else { return }
+        try? await Moderation.markDisclosed(store, topic: pending.topic)
+        pendingDisclosure = nil
+        pending.action()
+    }
+
+    /// Sends a report to the moderation service. "Received" is only shown after
+    /// the service answered with an id; otherwise it is logged as failed.
+    func report(category: String, channelId: String, txid: String?, sender: String?, op: String?, plaintext: String?, note: String) async -> Bool {
+        guard let store else { return false }
+        var body: [String: Any] = ["category": category, "channelId": channelId, "note": String(note.prefix(2000)), "app": "ios/1.21.0"]
+        if let txid { body["txid"] = txid }
+        if let sender { body["sender"] = sender }
+        if let op { body["op"] = op }
+        if let plaintext { body["plaintext"] = plaintext; body["consentPlaintext"] = true }
+        let (code, json) = await httpJSON("POST", "\(moderationBase)/reports", body: body)
+        let now = Int(Date().timeIntervalSince1970)
+        let entry: ReportEntry
+        if code == 201, let id = json["id"] as? String, let token = json["statusToken"] as? String {
+            entry = ReportEntry(id: id, token: token, category: category, status: "received", at: now)
+        } else {
+            entry = ReportEntry(id: "local-\(now)", token: "", category: category, status: "failed", at: now)
+        }
+        reportLog.append(entry)
+        try? await store.putMeta(key: Moderation.reportsKey, value: reportLog)
+        if entry.status == "received" {
+            show("Report received — reference \(entry.id.prefix(8))…. Follow it under You → Reports.")
+        } else {
+            show("The report service could not be reached. The report is kept as failed; retry, or send it by e-mail (no receipt).", kind: .error)
+        }
+        return entry.status == "received"
+    }
+
+    func refreshReportStatuses() async {
+        guard let store else { return }
+        for index in reportLog.indices where !reportLog[index].token.isEmpty {
+            let (code, json) = await httpJSON("GET", "\(moderationBase)/reports/\(reportLog[index].id)/status", token: reportLog[index].token)
+            if code == 200, let status = json["status"] as? String { reportLog[index].status = status }
+        }
+        try? await store.putMeta(key: Moderation.reportsKey, value: reportLog)
+    }
+
+    func appealReport(_ entry: ReportEntry, reason: String) async {
+        let (code, _) = await httpJSON("POST", "\(moderationBase)/reports/\(entry.id)/appeal", body: ["reason": String(reason.prefix(2000))], token: entry.token)
+        show(code == 200 ? "Appeal filed." : "Appeal could not be sent.", kind: code == 200 ? .info : .error)
+        await refreshReportStatuses()
+    }
+
+    /// Pulls the signed moderation feed; anything but a valid, newer feed is ignored.
+    func refreshModerationFeed() async {
+        guard let store, settings.mode != .demo, let url = URL(string: "\(moderationBase)/moderation/feed") else { return }
+        guard let (data, response) = try? await URLSession.shared.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return }
+        if (try? await Moderation.accept(store, data: data)) == .ok {
+            await loadTrustState()
+            await reload()
+        }
+    }
+
+    // MARK: Orphaned stores (v1.21, P0.5)
+
+    /// Ids of quarantined stores on this device — names only, never contents.
+    func orphanedStores() -> [String] { StoreQuarantine.orphans().map(\.id) }
+
+    func deleteOrphanedStore(_ id: String) {
+        StoreQuarantine.delete(id: id, liveDatabase: Store.defaultURL())
+        show("Orphaned data deleted.")
+    }
+
+    // MARK: Storage protection (v1.21, P0.6)
+
+    /// Applies backup exclusion + file protection to the Spiek folder. Fail-closed:
+    /// a failure is reported as an error banner rather than ignored.
+    func reapplyStorageProtection() {
+        guard settings.mode != .demo else { return }
+        do {
+            try StorageProtection.apply(to: Store.defaultURL().deletingLastPathComponent())
+        } catch {
+            report(error)
+        }
     }
 
     // MARK: BSV21 tokens (v1.20)
@@ -1601,7 +1799,12 @@ final class AppModel {
     /// Stages a picked image so its size and quality can be tuned before it
     /// costs anything.
     func stageImage(_ image: UIImage, data: Data) {
-        pendingImage = PendingImage(original: image, originalData: data)
+        // v1.21 (P0.2/P0.3): terms, then the one-time "image bytes are public and
+        // permanent" disclosure, before the image is staged.
+        requireTerms { [weak self] in
+            guard let self else { return }
+            Task { await self.requireDisclosure("media") { self.pendingImage = PendingImage(original: image, originalData: data) } }
+        }
     }
 
     func cancelPendingImage() {
@@ -1729,8 +1932,10 @@ final class AppModel {
         return resized.jpegData(compressionQuality: quality)
     }
 
-    func loadMedia(for reference: Codecs.MediaRef) async -> UIImage? {
+    func loadMedia(for reference: Codecs.MediaRef, txid: String? = nil, sender: String? = nil) async -> UIImage? {
         guard let engine else { return nil }
+        // v1.21 (P0.2): a legal block means the bytes are never downloaded.
+        if let txid, let sender, await engine.isFetchForbidden(txid: txid, sender: sender) { return nil }
         do {
             guard let stored = try await engine.loadMedia(txid: reference.txid,
                                                           vout: reference.vout,

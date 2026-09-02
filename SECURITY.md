@@ -103,5 +103,5 @@ off-chain support data; chain records are permanent by construction.
 
 ```bash
 cd SpiekCore && swift test
-# -> Executed 169 tests, with 0 failures
+# -> Executed 176 tests, with 0 failures
 ```

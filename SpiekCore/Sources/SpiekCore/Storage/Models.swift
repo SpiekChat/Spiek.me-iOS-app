@@ -285,6 +285,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var utxoURL: String
     /// BSV21 token-index base URL (…/bsv21/v1); blank = no token section.
     public var tokenURL: String = ""
+    /// v1.21 (P0.2): base URL of the report/moderation service (…/v1).
+    public var moderationURL: String = "https://spiek.me/api/moderation/v1"
 
     /// Miners started rejecting anything under this, so it is both the
     /// default and a hard floor.
@@ -309,7 +311,8 @@ public struct Settings: Codable, Equatable, Sendable {
                 watchURL: String = "",
                 broadcastURL: String = "",
                 utxoURL: String = "",
-                tokenURL: String = "") {
+                tokenURL: String = "",
+                moderationURL: String = "https://spiek.me/api/moderation/v1") {
         self.mode = mode
         self.feePerByte = feePerByte
         self.dust = dust
@@ -323,6 +326,7 @@ public struct Settings: Codable, Equatable, Sendable {
         self.broadcastURL = broadcastURL
         self.utxoURL = utxoURL
         self.tokenURL = tokenURL
+        self.moderationURL = moderationURL
     }
 
     /// Tolerant decoding, so a settings blob written by an earlier build keeps
@@ -342,6 +346,7 @@ public struct Settings: Codable, Equatable, Sendable {
         broadcastURL = try c.decodeIfPresent(String.self, forKey: .broadcastURL) ?? ""
         utxoURL = try c.decodeIfPresent(String.self, forKey: .utxoURL) ?? ""
         tokenURL = try c.decodeIfPresent(String.self, forKey: .tokenURL) ?? ""
+        moderationURL = try c.decodeIfPresent(String.self, forKey: .moderationURL) ?? "https://spiek.me/api/moderation/v1"
     }
 
     /// Clamps anything a stored settings blob or the settings screen might

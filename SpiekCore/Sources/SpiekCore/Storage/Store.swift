@@ -36,6 +36,12 @@ final class SQLiteDatabase: @unchecked Sendable {
         if let handle { sqlite3_close_v2(handle) }
     }
 
+    /// Closes the connection now (P0.5 quarantine moves the files afterwards).
+    func close() {
+        if let handle { sqlite3_close_v2(handle) }
+        handle = nil
+    }
+
     var lastErrorMessage: String {
         handle.map { String(cString: sqlite3_errmsg($0)) } ?? "no connection"
     }
@@ -137,6 +143,66 @@ final class SQLiteDatabase: @unchecked Sendable {
 
 /// SQLite-backed replacement for the web app's IndexedDB cache.
 ///
+/// v1.21 (P0.6): the whole Spiek folder — database, WAL/SHM sidecars, any
+/// cache, log or export written beside them — is excluded from backups and
+/// sealed with `completeUntilFirstUserAuthentication`. The class is deliberate:
+/// the poll loop and WAL checkpoints must keep working after a reboot while
+/// the phone is still in a pocket, which `complete` would break. Nothing here
+/// ever holds the private key, seed or WIF; those live in the Keychain.
+/// Fail-closed: an attribute we cannot set is thrown, never ignored, so a
+/// production build refuses to run unprotected rather than silently degrade.
+public enum StorageProtection {
+    public struct Failure: Error, CustomStringConvertible {
+        public let path: String
+        public let underlying: Error
+        public var description: String { "could not protect \(path): \(underlying)" }
+    }
+
+    /// Applies backup exclusion + file protection to `folder` and everything
+    /// under it. Call after opening the store and again whenever sidecars may
+    /// have been recreated (foreground, after a checkpoint).
+    public static func apply(to folder: URL) throws {
+        try applyOne(folder)
+        guard let walker = FileManager.default.enumerator(at: folder,
+                                                          includingPropertiesForKeys: [.isDirectoryKey],
+                                                          options: []) else { return }
+        for case let url as URL in walker { try applyOne(url) }
+    }
+
+    static func applyOne(_ url: URL) throws {
+        #if canImport(Darwin)
+        var target = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do { try target.setResourceValues(values) } catch { throw Failure(path: url.path, underlying: error) }
+        #if os(iOS)
+        do {
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: url.path)
+        } catch { throw Failure(path: url.path, underlying: error) }
+        #endif
+        #endif
+    }
+
+    /// For tests and self-checks: true when `url` is excluded from backup
+    /// (and, on iOS, carries the expected protection class).
+    public static func isProtected(_ url: URL) -> Bool {
+        #if canImport(Darwin)
+        guard let values = try? url.resourceValues(forKeys: [.isExcludedFromBackupKey]),
+              values.isExcludedFromBackup == true else { return false }
+        #if os(iOS)
+        let attrs = (try? FileManager.default.attributesOfItem(atPath: url.path)) ?? [:]
+        return (attrs[.protectionKey] as? FileProtectionType) == .completeUntilFirstUserAuthentication
+        #else
+        return true
+        #endif
+        #else
+        return true
+        #endif
+    }
+}
+
 /// Records are stored as JSON blobs beside the few columns we actually query
 /// on, which keeps the schema stable while record shapes evolve.
 public actor Store {
@@ -145,13 +211,10 @@ public actor Store {
     private let decoder = JSONDecoder()
 
     public static func defaultURL() -> URL {
-        // File protection stays at iOS's default (complete until first
-        // unlock): the poll loop and WAL checkpoints must keep working while
-        // the phone is locked in a pocket. The database holds message history
-        // — including cached plaintext of own encrypted sends — so the trade
-        // is deliberate: the container is still encrypted at rest before
-        // first unlock, and the wallet key itself never lives here, only in
-        // the Keychain.
+        // Protection class and backup exclusion are applied explicitly in
+        // `init(url:)` via `StorageProtection` (v1.21) — see that type for
+        // the reasoning. The wallet key itself never lives here, only in the
+        // Keychain.
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
         let folder = base.appendingPathComponent("Spiek", isDirectory: true)
@@ -163,6 +226,21 @@ public actor Store {
     public init(url: URL?) throws {
         db = try SQLiteDatabase(path: url?.path ?? ":memory:")
         try Store.migrate(db)
+        // v1.21 (P0.6): seal the folder — database, -wal, -shm and whatever
+        // else lives beside them — before anything is read into memory.
+        if let url { try StorageProtection.apply(to: url.deletingLastPathComponent()) }
+    }
+
+    /// Closes the underlying connection so the files can be moved aside
+    /// (v1.21, P0.5 quarantine). The store must not be used afterwards.
+    public func close() {
+        db.close()
+    }
+
+    /// Re-applies protection to the store's folder (sidecars can be recreated
+    /// by SQLite after a checkpoint). No-op for in-memory stores.
+    public func reapplyProtection(folder: URL?) throws {
+        if let folder { try StorageProtection.apply(to: folder) }
     }
 
     // MARK: Schema

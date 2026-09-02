@@ -234,11 +234,15 @@ struct WalletView: View {
     }
 
     private var runwayText: String {
-        let costPerMessage = max(UInt64(11), UInt64(Double(400) * model.settings.feePerByte) + model.settings.dust)
+        // v1.21 (P0.1): transaction cost, split as every wallet does — the
+        // network fee is what the blockchain charges for any transaction; the
+        // service fee is Spiek's fixed part. A message *is* a transaction.
+        let network = max(UInt64(11), UInt64(Double(400) * model.settings.feePerByte) + model.settings.dust)
+        let costPerMessage = network + ServiceFee.messageSats
         guard costPerMessage > 0 else { return "—" }
         let count = model.balance / costPerMessage
         if count == 0 { return "Your balance is too low for a message. Top up through Receive." }
-        return "About \(Format.sats(count)) messages, at roughly \(costPerMessage) sats each."
+        return "About \(Format.sats(count)) messages. Transaction cost per message: network fee ~\(network) sats + service fee \(ServiceFee.messageSats) sats = ~\(costPerMessage) sats."
     }
 
     private func loadActivity() async {

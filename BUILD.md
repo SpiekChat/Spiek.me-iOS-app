@@ -10,8 +10,8 @@ JavaScript, no external dependencies.
 
 | | |
 |---|---|
-| Xcode | 16.0 or newer (the project uses file-system synchronized groups) |
-| macOS | Sonoma 14.5 or newer |
+| Xcode | 26 or newer — App Store uploads require the iOS 26 SDK since 28 April 2026 (the project uses file-system synchronized groups) |
+| macOS | Sequoia 15.6 or newer |
 | iOS target | 17.0 |
 | Developer account | **Organization** enrollment — see §7 |
 
@@ -31,8 +31,8 @@ mkdir -p ~/Developer && cd ~/Developer && git clone https://github.com/SpiekChat
 
 This is not a preference. A sync client resolves a clash by leaving a *second*
 copy of the file next to the original — `WalletView (conflicted copy).swift`,
-or `WalletView 2.swift`. This target uses an Xcode 16 file-system-synchronized
-group, which compiles **every** `.swift` it finds in the folder, so those copies
+or `WalletView 2.swift`. This target uses a file-system-synchronized group
+(introduced in Xcode 16, still the structure under Xcode 26), which compiles **every** `.swift` it finds in the folder, so those copies
 are compiled too. The build then fails with `Invalid redeclaration of
 'WalletView'`, pointing at code that is perfectly correct. Xcode also writes to
 its own project files constantly while it is open, which is exactly what
@@ -551,9 +551,9 @@ need to relaunch.
 ## 12. Version history
 
 Marketing version and build number track the release number: this build
-ships as **1.20.1 (build 21)** — see [CHANGELOG.md](CHANGELOG.md) for 1.20.0
-(encrypted groups, BSV21 balances, fuzzing) and 1.20.1 (keyed invites as
-secrets, documentation corrections). The notes below are the v17 review
+ships as **1.21.0 (build 22)** — see [CHANGELOG.md](CHANGELOG.md) for 1.20.0
+(encrypted groups, BSV21 balances, fuzzing), 1.20.1 (keyed invites as
+secrets, documentation corrections) and 1.21.0 (store-readiness round 2). The notes below are the v17 review
 round, kept for history.
 
 ### v17 — 1.17.0

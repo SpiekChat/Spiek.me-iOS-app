@@ -417,7 +417,7 @@ struct NewChatSheet: View {
                 .foregroundStyle(Palette.muted)
                 .padding(.bottom, 14)
 
-            RevealBox(text: created.code)
+            RevealBox(text: created.code, sensitive: created.groupKey != nil)
                 .padding(.bottom, 10)
 
             Text("You can find it back any time under the chat name in the list.")
@@ -770,7 +770,7 @@ struct RevealSheet: View {
                 if showQR {
                     QRCodeView(text: value, size: 160).padding(.bottom, 10)
                 }
-                RevealBox(text: value).padding(.bottom, 12)
+                RevealBox(text: value, sensitive: true).padding(.bottom, 12)
                 Button(showQR ? "Hide QR" : "Show QR") { showQR.toggle() }
                     .font(.mono(11.5))
                     .foregroundStyle(Palette.primary)

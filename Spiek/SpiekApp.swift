@@ -36,6 +36,9 @@ struct SpiekApp: App {
                     switch phase {
                     case .active:
                         privacyShield = false
+                        // v1.21 (P0.6): sidecars SQLite recreated meanwhile inherit
+                        // the protection class; failure surfaces as a hard error.
+                        model.reapplyStorageProtection()
                         guard model.phase == .ready, !model.isLocked else { return }
                         Task {
                             Notifier.clearDelivered()

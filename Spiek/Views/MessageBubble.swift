@@ -48,6 +48,8 @@ struct MessageBubble: View {
     var onDelete: () -> Void
 
     @State private var image: UIImage?
+    @State private var showReport = false
+    @State private var revealed = false
     @State private var loadingImage = false
     @State private var showLightbox = false
 
@@ -60,6 +62,20 @@ struct MessageBubble: View {
     }
 
     var body: some View {
+        // v1.21 (P0.2): soft-hidden by the moderation feed — one line, shown on request.
+        if message.hiddenSoft && !revealed {
+            Text("Hidden by moderation (possible spam) — tap to show")
+                .font(.sans(12))
+                .foregroundStyle(Palette.stamp)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .onTapGesture { revealed = true }
+        } else {
+            bubbleBody
+        }
+    }
+
+    private var bubbleBody: some View {
         VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
             if showSender && !mine {
                 Text(model.senderName(for: message))
@@ -80,6 +96,13 @@ struct MessageBubble: View {
         .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
         .padding(.bottom, 8)
         .contextMenu { contextMenu }
+        .sheet(isPresented: $showReport) {
+            ReportSheet(channelId: message.record.channel,
+                        txid: message.record.txid,
+                        sender: message.record.sender,
+                        op: message.viewOp.name,
+                        plaintext: message.viewOp == .msg ? message.text : nil) { showReport = false }
+        }
         .fullScreenCover(isPresented: $showLightbox) {
             if let image { Lightbox(image: image) }
         }
@@ -362,6 +385,10 @@ struct MessageBubble: View {
         // Per sender, so it also works in a group where only individual
         // messages identify who wrote them. Local only — see AppModel.
         if !mine {
+            // v1.21 (P0.2): report from the message itself.
+            Button(role: .destructive) { showReport = true } label: {
+                Label("Report…", systemImage: "flag")
+            }
             Button(role: .destructive) {
                 Task { await model.setBlocked(message.record.sender, blocked: true) }
             } label: {
@@ -374,7 +401,7 @@ struct MessageBubble: View {
         guard message.viewOp == .media, image == nil, let reference = message.mediaRef else { return }
         loadingImage = true
         defer { loadingImage = false }
-        image = await model.loadMedia(for: reference)
+        image = await model.loadMedia(for: reference, txid: message.record.txid, sender: message.record.sender)
     }
 }
 

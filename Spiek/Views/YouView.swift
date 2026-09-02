@@ -17,13 +17,12 @@ struct YouView: View {
     /// One enum rather than two `.sheet` modifiers on the same view: SwiftUI
     /// keeps a single presentation slot per view, so stacking them is fragile.
     private enum ActiveSheet: String, Identifiable {
-        case phrase, wif, names
+        case phrase, wif, names, forget
         var id: String { rawValue }
     }
 
     @State private var activeSheet: ActiveSheet?
     @State private var confirmSignOut = false
-    @State private var confirmWipe = false
     @State private var confirmPublish = false
 
     var body: some View {
@@ -269,18 +268,51 @@ struct YouView: View {
                     }
                     .buttonStyle(OutlineButtonStyle(foreground: confirmSignOut ? Palette.danger : Palette.muted))
 
-                    Button(confirmWipe ? "Wipes key and chats — tap again" : "Forget this device") {
-                        if confirmWipe {
-                            Task { await model.wipeDevice() }
-                        } else {
-                            confirmWipe = true
-                            Task {
-                                try? await Task.sleep(nanoseconds: 4_000_000_000)
-                                confirmWipe = false
+                    // v1.21 (P0.2): reports, moderation feed status and the legal pages.
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Safety & legal").font(.mono(11)).foregroundStyle(Palette.stamp)
+                        ForEach([("Terms", "/terms.html"), ("Privacy", "/privacy.html"), ("Community Standards", "/community-standards.html"),
+                                 ("Child safety & CSAE standards", "/child-safety.html"), ("Data deletion", "/data-deletion.html")], id: \.0) { item in
+                            Link(item.0, destination: URL(string: "https://spiek.me\(item.1)")!)
+                                .font(.sans(13.5)).foregroundStyle(Palette.primary)
+                        }
+                        Text((model.termsAccepted ? "Terms accepted (v\(Moderation.termsVersion)) · " : "Terms not yet accepted · ") + model.feedStatus)
+                            .font(.mono(11)).foregroundStyle(Palette.stamp)
+                        if !model.reportLog.isEmpty {
+                            Text("Reports").font(.mono(11)).foregroundStyle(Palette.stamp).padding(.top, 6)
+                            ForEach(model.reportLog.reversed()) { entry in
+                                Text("\(entry.category) · \(entry.status) · \(entry.id.prefix(8))…")
+                                    .font(.mono(11.5))
+                                    .foregroundStyle(entry.status == "failed" ? Palette.danger : Palette.body)
                             }
+                            Button("Refresh report statuses") { Task { await model.refreshReportStatuses() } }
+                                .buttonStyle(OutlineButtonStyle(foreground: Palette.muted))
                         }
                     }
-                    .buttonStyle(OutlineButtonStyle(foreground: confirmWipe ? Palette.danger : Palette.muted))
+                    .padding(.top, 10)
+
+                    // v1.21 (P0.8): a guarded flow — re-auth, phrase confirmation,
+                    // typed confirmation when funds are present — not a tap-again.
+                    Button("Forget this device") { activeSheet = .forget }
+                        .buttonStyle(OutlineButtonStyle(foreground: Palette.muted))
+
+                    // v1.21 (P0.5): stores of other wallets that were set aside unread.
+                    let orphans = model.orphanedStores()
+                    if !orphans.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Orphaned data")
+                                .font(.mono(11))
+                                .foregroundStyle(Palette.stamp)
+                            Text("Chat data that belonged to a different wallet was found on this device and set aside without being opened. It is never shown; you can only delete it.")
+                                .font(.sans(13))
+                                .foregroundStyle(Palette.muted)
+                            ForEach(orphans, id: \.self) { id in
+                                Button("Delete orphan \(id.prefix(8))…") { model.deleteOrphanedStore(id) }
+                                    .buttonStyle(OutlineButtonStyle(foreground: Palette.danger))
+                            }
+                        }
+                        .padding(.top, 10)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
@@ -319,6 +351,8 @@ struct YouView: View {
                 RevealSheet(title: "Private key", value: model.engine?.recoveryWIF ?? "")
             case .names:
                 NamesSheet()
+            case .forget:
+                ForgetDeviceSheet { activeSheet = nil }
             }
         }
     }

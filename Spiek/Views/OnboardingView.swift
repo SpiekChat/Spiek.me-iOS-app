@@ -43,8 +43,14 @@ struct OnboardingView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 16)
 
-                    Text("Spiek generates a key pair right here. No phone number, no email, no server that can lock you out.")
+                    Text("Spiek generates a key pair right here. No phone number, no email, no central message database that can lock you out.")
                         .font(.sans(15.5))
+                        .foregroundStyle(Palette.onDark)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, 12)
+                    // v1.21 (P0.1): the transaction model, up front.
+                    Text("Every message is a transaction on the Bitcoin SV blockchain, fetched through replaceable network endpoints rather than a Spiek server. A transaction always costs a network fee (a fraction of a cent); Spiek adds a fixed service fee of \(ServiceFee.messageSats) sats per message and \(ServiceFee.imageSats) per image, always shown before you send.")
+                        .font(.sans(13.5))
                         .foregroundStyle(Palette.onDark)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 24)

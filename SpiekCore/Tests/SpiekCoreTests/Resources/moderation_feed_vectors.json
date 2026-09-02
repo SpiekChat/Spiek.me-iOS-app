@@ -1,0 +1,147 @@
+{
+  "format": "spiek moderation feed vectors v1",
+  "pinned": {
+    "keyId": "564341be",
+    "pubkey": "02505f234a81fe3af88625ebda259dbaec44c72b181e2f64735f8b8ec8d7cf7377"
+  },
+  "canonicalHex": "737069656b2d6d6f64666565642d76311f311f34321f323032362d30392d30315430303a30303a30302e3030305a1f323039392d30312d30315430303a30303a30302e3030305a1f35363433343162651f73656e6465723a656665666566656665666566656665666566656665666566656665666566656665666566656665663a736f66745f686964652c747869643a616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261623a706f6c6963795f626c6f636b2c747869643a636463646364636463646364636463646364636463646364636463646364636463646364636463646364636463646364636463646364636463646364636463643a6c6567616c5f626c6f636b",
+  "valid": {
+    "version": 1,
+    "seq": 42,
+    "issuedAt": "2026-09-01T00:00:00.000Z",
+    "expiresAt": "2099-01-01T00:00:00.000Z",
+    "keyId": "564341be",
+    "signer": "02505f234a81fe3af88625ebda259dbaec44c72b181e2f64735f8b8ec8d7cf7377",
+    "entries": [
+      {
+        "kind": "txid",
+        "value": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "level": "legal_block"
+      },
+      {
+        "kind": "sender",
+        "value": "efefefefefefefefefefefefefefefefefefefef",
+        "level": "soft_hide"
+      },
+      {
+        "kind": "txid",
+        "value": "abababababababababababababababababababababababababababababababab",
+        "level": "policy_block"
+      }
+    ],
+    "sig": "30450221008e407a1b40a6b3d01bede71a32e70b13d5de8e2d5113d24479bbcc0e4c5b5f4a0220576f11858082fa653d29431c1646632b80bffb9c1ed48c52a5265a7596fddcb6"
+  },
+  "expect": {
+    "valid": "OK",
+    "cd..txid": "legal_block",
+    "ef..sender": "soft_hide",
+    "ab..txid": "policy_block",
+    "lastAcceptedSeq42": "STALE"
+  },
+  "negatives": {
+    "expired": {
+      "version": 1,
+      "seq": 43,
+      "issuedAt": "2026-09-01T00:00:00.000Z",
+      "expiresAt": "2020-01-01T00:00:00.000Z",
+      "keyId": "564341be",
+      "signer": "02505f234a81fe3af88625ebda259dbaec44c72b181e2f64735f8b8ec8d7cf7377",
+      "entries": [
+        {
+          "kind": "txid",
+          "value": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+          "level": "legal_block"
+        },
+        {
+          "kind": "sender",
+          "value": "efefefefefefefefefefefefefefefefefefefef",
+          "level": "soft_hide"
+        },
+        {
+          "kind": "txid",
+          "value": "abababababababababababababababababababababababababababababababab",
+          "level": "policy_block"
+        }
+      ],
+      "sig": "3045022100e84bbe5601d7c2da19f6010f5aa48146642ec36390600b04603f164610f1c5c6022029e1b57098b1a0ef2b919c69bc52c2ec6bdb2e198e16cfc458b37cc46538c8cd"
+    },
+    "older": {
+      "version": 1,
+      "seq": 41,
+      "issuedAt": "2026-09-01T00:00:00.000Z",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "keyId": "564341be",
+      "signer": "02505f234a81fe3af88625ebda259dbaec44c72b181e2f64735f8b8ec8d7cf7377",
+      "entries": [
+        {
+          "kind": "txid",
+          "value": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+          "level": "legal_block"
+        },
+        {
+          "kind": "sender",
+          "value": "efefefefefefefefefefefefefefefefefefefef",
+          "level": "soft_hide"
+        },
+        {
+          "kind": "txid",
+          "value": "abababababababababababababababababababababababababababababababab",
+          "level": "policy_block"
+        }
+      ],
+      "sig": "304602210088ef9bea97ca46e77d96fee2952be3fd619eff5352df4048d843860e5cccf1a6022100c793aacf0e57046215aab5928354309e02ccef3875519c11349f7fa0d12e41f4"
+    },
+    "tampered": {
+      "version": 1,
+      "seq": 42,
+      "issuedAt": "2026-09-01T00:00:00.000Z",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "keyId": "564341be",
+      "signer": "02505f234a81fe3af88625ebda259dbaec44c72b181e2f64735f8b8ec8d7cf7377",
+      "entries": [
+        {
+          "kind": "txid",
+          "value": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+          "level": "soft_hide"
+        },
+        {
+          "kind": "sender",
+          "value": "efefefefefefefefefefefefefefefefefefefef",
+          "level": "soft_hide"
+        },
+        {
+          "kind": "txid",
+          "value": "abababababababababababababababababababababababababababababababab",
+          "level": "soft_hide"
+        }
+      ],
+      "sig": "30450221008e407a1b40a6b3d01bede71a32e70b13d5de8e2d5113d24479bbcc0e4c5b5f4a0220576f11858082fa653d29431c1646632b80bffb9c1ed48c52a5265a7596fddcb6"
+    },
+    "wrongKey": {
+      "version": 1,
+      "seq": 42,
+      "issuedAt": "2026-09-01T00:00:00.000Z",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "keyId": "96b4004e",
+      "signer": "0232de2277032115f7745c3fef4a807ddbe83ca842920980010a211482c30327f7",
+      "entries": [
+        {
+          "kind": "txid",
+          "value": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+          "level": "legal_block"
+        },
+        {
+          "kind": "sender",
+          "value": "efefefefefefefefefefefefefefefefefefefef",
+          "level": "soft_hide"
+        },
+        {
+          "kind": "txid",
+          "value": "abababababababababababababababababababababababababababababababab",
+          "level": "policy_block"
+        }
+      ],
+      "sig": "3045022100c920a0adadce273c56eaeb5aa5db8dc583c3b4251267df961871ac055e05f7cf02206c363222a94b48d7ec4ff7abbaec383fffebe2bb06dbdc5fb7c8254c0272d238"
+    }
+  }
+}

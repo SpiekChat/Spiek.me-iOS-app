@@ -10,6 +10,8 @@ public struct ViewMessage: Identifiable, Equatable, Sendable {
     public var encrypted: Bool
     /// True when the record is an `emsg` we could not open.
     public var unreadable: Bool
+    /// v1.21 (P0.2): the moderation feed marked this `soft_hide` — shown only on request.
+    public var hiddenSoft: Bool = false
 
     public var edited: [UInt8]? = nil
     public var editTime: Int? = nil
@@ -702,8 +704,7 @@ public actor Engine {
         if countUnread, !mine, [SpiekOp.msg, .media, .emsg].contains(envelope.op) {
             // A blocked sender's messages are hidden, so they must not count
             // either — a badge for something that never shows is a haunting.
-            let blocked = try await blockedSenders()
-            if !blocked.contains(sender) {
+            if try await !isSuppressed(txid: record.txid, sender: sender) {
                 channel.unread += 1
             }
         }
@@ -957,7 +958,10 @@ public actor Engine {
         record.fee = built.fee
         record.paySats = request.paySats
         if shouldEncrypt {
-            record.decrypted = request.payload.hex
+            // v1.21 (P0.5): the cached plaintext of our own sends is sealed under
+            // a key derived from the wallet, so a store that ends up under another
+            // wallet — or copied off the device — holds no readable text.
+            record.decrypted = try sealCache(request.payload)
             record.decryptedOp = request.op
             record.decryptedRef = request.ref?.reversedBytes.hex
         }
@@ -1114,6 +1118,7 @@ public actor Engine {
         let raw = try await store.messages(channel: channelId, limit: limit * 3, before: before)
         let byTxid = Dictionary(uniqueKeysWithValues: raw.map { ($0.txid, $0) })
         let blocked = try await blockedSenders()
+        let feed = try? await Moderation.accepted(store)
 
         var visible = [ViewMessage]()
         var modifiers = [ViewMessage]()
@@ -1121,7 +1126,10 @@ public actor Engine {
         for record in raw {
             // A blocked sender's records are neither rendered nor allowed to
             // touch anyone else's messages with edits, deletions or reactions.
+            // v1.21 (P0.2): policy/legal blocks from the signed feed likewise.
             if !record.mine, blocked.contains(record.sender) { continue }
+            let ruling = feed?.level(txid: record.txid, sender: record.mine ? nil : record.sender)
+            if ruling == .policyBlock || ruling == .legalBlock { continue }
 
             var effectiveOp = record.op
             var effectivePayload = Hex.decode(record.payload) ?? []
@@ -1156,6 +1164,7 @@ public actor Engine {
                 message.edited = record.editedPayload.flatMap { Hex.decode($0) }
                 message.editTime = record.editedTime
                 message.deleted = record.deleted ?? false
+                message.hiddenSoft = ruling == .softHide
                 visible.append(message)
             case .edit, .del, .react:
                 var modifier = ViewMessage(record: record,
@@ -1285,13 +1294,33 @@ public actor Engine {
                                  isMissing: false)
     }
 
+    private static let cachePrefix = "c1:"
+
+    private var cacheKey: [UInt8] {
+        Hash.sha256(Array("spiek-cache-v1".utf8) + wallet.key.bytes)
+    }
+
+    private func sealCache(_ plaintext: [UInt8]) throws -> String {
+        Engine.cachePrefix + (try AESGCM.seal(plaintext: plaintext, key: cacheKey)).hex
+    }
+
+    /// Opens a sealed cache entry; accepts pre-1.21 plain hex for old rows.
+    private func openCache(_ stored: String) -> [UInt8]? {
+        guard stored.hasPrefix(Engine.cachePrefix) else { return Hex.decode(stored) }
+        guard let sealed = Hex.decode(String(stored.dropFirst(Engine.cachePrefix.count))) else { return nil }
+        return try? AESGCM.open(sealed: sealed, key: cacheKey)
+    }
+
     /// Opens an `emsg` record, using the cached plaintext when we wrote it.
     public func decryptRecord(_ record: MessageRecord) async throws -> InnerEnvelope? {
-        if let decrypted = record.decrypted, let op = record.decryptedOp {
+        if let decrypted = record.decrypted, let op = record.decryptedOp,
+           let payload = openCache(decrypted) {
             return InnerEnvelope(op: op,
-                                 payload: Hex.decode(decrypted) ?? [],
+                                 payload: payload,
                                  ref: record.decryptedRef.flatMap { Hex.decode($0)?.reversedBytes })
         }
+        // A cache we cannot open (another wallet's key) falls through to a real
+        // decrypt, which also fails for a foreign record — unreadable, not leaked.
 
         let channel = try await store.channel(record.channel)
         // v1.20, encrypted groups: a group record decrypts under the channel's
@@ -1341,6 +1370,18 @@ public actor Engine {
     /// device refuses to show. Local only — nothing about a block goes on
     /// chain, and the other side is never told.
     static let blockedKey = "blocked"
+
+    /// v1.21 (P0.2): true for anything that must not be rendered, counted,
+    /// notified about or fetched — a blocked sender, or any feed entry.
+    public func isSuppressed(txid: String, sender: String) async throws -> Bool {
+        if try await blockedSenders().contains(sender) { return true }
+        return (try? await Moderation.accepted(store))?.level(txid: txid, sender: sender) != nil
+    }
+
+    /// True when media bytes for this record must never be downloaded (legal block).
+    public func isFetchForbidden(txid: String, sender: String) async -> Bool {
+        (try? await Moderation.accepted(store))?.level(txid: txid, sender: sender) == .legalBlock
+    }
 
     public func blockedSenders() async throws -> Set<String> {
         Set(try await store.meta([String].self, key: Engine.blockedKey) ?? [])

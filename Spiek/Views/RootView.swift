@@ -24,6 +24,16 @@ struct RootView: View {
             }
         }
         .noticeOverlay($model.notice)
+        // v1.21 (P0.2/P0.3): blocking sheets — terms before the first post, and
+        // the one-time public/permanent disclosures.
+        .sheet(isPresented: Binding(get: { model.pendingTermsAction != nil }, set: { if !$0 { model.pendingTermsAction = nil } })) {
+            TermsSheet { model.pendingTermsAction = nil }
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: Binding(get: { model.pendingDisclosure != nil }, set: { if !$0 { model.pendingDisclosure = nil } })) {
+            DisclosureSheet(topic: model.pendingDisclosure?.topic ?? "") { model.pendingDisclosure = nil }
+                .presentationDetents([.medium])
+        }
         .animation(.easeInOut(duration: 0.25), value: model.phase)
         .animation(.easeInOut(duration: 0.2), value: model.isLocked)
     }

@@ -405,17 +405,32 @@ struct SheetHeader: View {
 }
 
 /// Copy-to-clipboard block for keys, addresses and recovery phrases.
+///
+/// v1.21: `sensitive` marks a secret (recovery phrase, WIF, keyed group
+/// invite). A secret is never text-selectable — the system copy menu would
+/// bypass the local-only, expiring pasteboard route — and is flagged
+/// privacy-sensitive for system contexts that honour it. Public values
+/// (addresses, plain chat codes) keep ordinary selection.
 struct RevealBox: View {
     var text: String
+    var sensitive: Bool = false
 
     var body: some View {
-        Text(text)
-            .font(.mono(12))
-            .foregroundStyle(Palette.body)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(Palette.surface)
-            .squareEdge(Palette.border)
+        Group {
+            if sensitive {
+                Text(text)
+                    .textSelection(.disabled)
+                    .privacySensitive()
+            } else {
+                Text(text)
+                    .textSelection(.enabled)
+            }
+        }
+        .font(.mono(12))
+        .foregroundStyle(Palette.body)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Palette.surface)
+        .squareEdge(Palette.border)
     }
 }

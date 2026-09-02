@@ -10,6 +10,59 @@ Full build notes, design decisions and the on-device test matrix live in
 
 ---
 
+## [1.21.0] — 2026-09-01 (build 22) — store-readiness round 2
+
+### Added
+
+- **Trust & Safety (P0.2).** Report a person, message, image or group in nine
+  categories (child safety/CSAE included) to the moderation service: a
+  structured bundle, message text only with explicit consent, never a group
+  key or your own keys. Reports have a real status (received → in review →
+  closed, or appealed) that the app polls with a capability token; "received"
+  is shown only after the service answered. E-mail remains a visible fallback
+  and says so ("no receipt"). Versioned Terms & Community Standards must be
+  accepted before the first post. The operator's **signed moderation feed**
+  is enforced by default with three levels — `soft_hide` (shown on request),
+  `policy_block` (never shown), `legal_block` (never shown, never fetched) —
+  verified like an SNS answer under a pinned key; a failed, expired or older
+  feed is ignored and never releases an existing block. Blocked or listed
+  senders are not rendered, not counted as unread, not notified about, and
+  their media is not downloaded.
+- **Just-in-time disclosures (P0.3).** One specific warning before the first
+  public-group post and before the first image: permanent, public, on the
+  blockchain.
+- **Wallet-bound storage (P0.5).** The store records a domain-separated
+  fingerprint of the wallet's public key. A store of another wallet is
+  quarantined under an opaque random name — journaled, resumed after a crash,
+  never rendered, only deletable from *You → Orphaned data*. A store from an
+  older build is adopted only when its contents prove the wallet. The cached
+  plaintext of own encrypted sends is now sealed under a wallet-derived key.
+- **Transaction cost (P0.1).** Costs are shown as *network fee + service fee =
+  total*; onboarding explains the transaction model. "No server" wording
+  replaced by "no central message database; replaceable endpoints".
+- **Storage protection (P0.6).** The whole Spiek folder — database, WAL/SHM,
+  any cache or export beside them — is excluded from backups and sealed with
+  `completeUntilFirstUserAuthentication` (background polling after a reboot
+  must keep working, which `complete` would break). Applied at open and again
+  on every foreground; a failure is a hard error, never ignored.
+- **Forget this device (P0.8)** is a guarded flow: re-authentication, a
+  confirmation that the recovery phrase is written down, and — with funds —
+  the balance, the address and a typed FORGET. It never signs or broadcasts.
+- **Secret surfaces (P0.9).** `RevealBox` has a sensitive mode without text
+  selection (keyed invites, recovery phrase, WIF) and `.privacySensitive()`.
+- Tests: `StorageProtectionTests` (3) and `TrustSafetyTests` (4: feed
+  canonical bytes + signature + refusals + levels, store ownership rules,
+  opaque journaled quarantine) — 176 XCTests.
+- CI (P0.7a): an `xcodebuild archive` job on Xcode 26 / the iOS 26 SDK
+  (unsigned build proof; `swift test` alone does not prove the upload
+  requirement), recording bundle id, version and dSYMs; actions pinned.
+
+### Changed
+
+- Documentation: macOS Sequoia 15.6 / Xcode 26 requirements.
+
+---
+
 ## [1.20.1] — 2026-09-01 (build 21) — keyed invites handled as secrets
 
 ### Security

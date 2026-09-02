@@ -1,7 +1,7 @@
-# Spiek.me — iOS app (v1.20.1)
+# Spiek.me — iOS app (v1.21.0)
 
 [![SpiekCore tests](https://github.com/SpiekChat/Spiek.me-iOS-app/actions/workflows/test.yml/badge.svg)](https://github.com/SpiekChat/Spiek.me-iOS-app/actions/workflows/test.yml)
-[![test count](https://img.shields.io/badge/SpiekCore_tests-169_passing_incl._group_vectors_%2B_fuzzing-2b8a3e?style=flat-square)](#tests)
+[![test count](https://img.shields.io/badge/SpiekCore_tests-176_passing_incl._moderation_%2B_protection-2b8a3e?style=flat-square)](#tests)
 [![platform](https://img.shields.io/badge/platform-iOS_17+_%C2%B7_SwiftUI-364fc7?style=flat-square)](#requirements)
 [![vectors](https://img.shields.io/badge/golden_vectors-byte--identical_with_Android-5f3dc4?style=flat-square)](https://github.com/SpiekChat/Spiek.me-Android-app)
 [![license](https://img.shields.io/badge/license-source--available-6a737d?style=flat-square)](LICENSE)
@@ -29,7 +29,7 @@ three.
 
 - Xcode 26 or newer (App Store uploads require the iOS 26 SDK since
   28 April 2026; the project uses filesystem-synchronized groups)
-- macOS Sonoma 14.5 or newer
+- macOS Sequoia 15.6 or newer (Xcode 26 requires it)
 - iOS 17.0+ (iPhone; iPad rotates freely)
 - Apple Developer account to run on a device — an **organization**
   enrollment is required for App Store submission (see below)
@@ -99,7 +99,7 @@ identical hex string, signatures included.
 
 ## App Store submission
 
-- Version: **1.20.1 (build 21)** — see [CHANGELOG.md](CHANGELOG.md)
+- Version: **1.21.0 (build 22)** — see [CHANGELOG.md](CHANGELOG.md)
 - `Spiek/PrivacyInfo.xcprivacy` present (no tracking; required-reason APIs
   C617.1 and E174.1 declared). The App Store privacy label is **not** "Data
   Not Collected": Spiek has no tracking and no analytics, but messages,
@@ -137,10 +137,10 @@ identical hex string, signatures included.
 
 ```bash
 cd SpiekCore && swift test
-# -> Executed 169 tests, with 0 failures
+# -> Executed 176 tests, with 0 failures
 ```
 
-169 XCTests on the pure-Swift package: golden vectors (hashes, phrase keys,
+176 XCTests on the pure-Swift package: golden vectors (hashes, phrase keys,
 WIF, addresses, pushData, signatures over SHA-256d, ECDH, AES-GCM, envelopes,
 codecs, complete built transactions), BIP-39, SNS and OpNS acceptance
 criteria, and engine scenarios (discovery, the `prev` chain, encryption
