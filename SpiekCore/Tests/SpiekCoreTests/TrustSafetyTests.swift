@@ -47,18 +47,27 @@ final class TrustSafetyTests: XCTestCase {
         XCTAssertEqual(feed.level(txid: String(repeating: "cd", count: 32), sender: String(repeating: "ef", count: 20)), .legalBlock, "strictest wins")
         XCTAssertNil(feed.level(txid: String(repeating: "11", count: 32), sender: String(repeating: "22", count: 20)))
 
+        // `XCTAssert*` takes an autoclosure, which cannot contain `await`:
+        // every async result is bound first, then asserted.
         let store = try Store(url: nil)
-        XCTAssertEqual(try await Moderation.accept(store, data: try data("valid"), pinnedKeyId: keyId, pinnedPubkey: pubkey), .ok)
+        let accepted = try await Moderation.accept(store, data: try data("valid"), pinnedKeyId: keyId, pinnedPubkey: pubkey)
+        XCTAssertEqual(accepted, .ok)
         let negatives = Self.root["negatives"] as! [String: Any]
-        XCTAssertEqual(try await Moderation.accept(store, data: try data("tampered", in: negatives), pinnedKeyId: keyId, pinnedPubkey: pubkey), .badSignature)
-        XCTAssertEqual(try await Moderation.accepted(store)?.seq, 42, "the accepted feed stays in force after a refusal")
+        let refused = try await Moderation.accept(store, data: try data("tampered", in: negatives), pinnedKeyId: keyId, pinnedPubkey: pubkey)
+        XCTAssertEqual(refused, .badSignature)
+        let inForce = try await Moderation.accepted(store)?.seq
+        XCTAssertEqual(inForce, 42, "the accepted feed stays in force after a refusal")
 
-        XCTAssertFalse(await Moderation.termsAccepted(store))
+        let termsBefore = await Moderation.termsAccepted(store)
+        XCTAssertFalse(termsBefore)
         try await Moderation.acceptTerms(store)
-        XCTAssertTrue(await Moderation.termsAccepted(store))
-        XCTAssertFalse(await Moderation.disclosed(store, topic: "media"))
+        let termsAfter = await Moderation.termsAccepted(store)
+        XCTAssertTrue(termsAfter)
+        let disclosedBefore = await Moderation.disclosed(store, topic: "media")
+        XCTAssertFalse(disclosedBefore)
         try await Moderation.markDisclosed(store, topic: "media")
-        XCTAssertTrue(await Moderation.disclosed(store, topic: "media"))
+        let disclosedAfter = await Moderation.disclosed(store, topic: "media")
+        XCTAssertTrue(disclosedAfter)
     }
 
     func testStoreOwnershipRules() async throws {
@@ -72,19 +81,26 @@ final class TrustSafetyTests: XCTestCase {
 
         // empty → adopted; then bob → mismatch, owner untouched
         let empty = try Store(url: nil)
-        XCTAssertEqual(try await StoreOwnership.verify(store: empty, fingerprint: aliceFp, ownHash: aliceHash), .adoptedEmpty)
-        XCTAssertEqual(try await StoreOwnership.verify(store: empty, fingerprint: aliceFp, ownHash: aliceHash), .match)
-        XCTAssertEqual(try await StoreOwnership.verify(store: empty, fingerprint: bobFp, ownHash: bobHash), .mismatch)
-        XCTAssertEqual(try await empty.meta(String.self, key: StoreOwnership.metaKey), aliceFp)
+        let first = try await StoreOwnership.verify(store: empty, fingerprint: aliceFp, ownHash: aliceHash)
+        XCTAssertEqual(first, .adoptedEmpty)
+        let again = try await StoreOwnership.verify(store: empty, fingerprint: aliceFp, ownHash: aliceHash)
+        XCTAssertEqual(again, .match)
+        let intruder = try await StoreOwnership.verify(store: empty, fingerprint: bobFp, ownHash: bobHash)
+        XCTAssertEqual(intruder, .mismatch)
+        let recordedOwner = try await empty.meta(String.self, key: StoreOwnership.metaKey)
+        XCTAssertEqual(recordedOwner, aliceFp)
 
         // legacy with alice's notes channel → adopted with proof; bob's → mismatch, nothing written
         let legacy = try Store(url: nil)
         try await legacy.putChannel(ChannelRecord(channelId: aliceHash, kind: .note, name: "Notes"))
-        XCTAssertEqual(try await StoreOwnership.verify(store: legacy, fingerprint: aliceFp, ownHash: aliceHash), .adoptedVerified)
+        let adopted = try await StoreOwnership.verify(store: legacy, fingerprint: aliceFp, ownHash: aliceHash)
+        XCTAssertEqual(adopted, .adoptedVerified)
         let foreign = try Store(url: nil)
         try await foreign.putChannel(ChannelRecord(channelId: bobHash, kind: .note, name: "Notes"))
-        XCTAssertEqual(try await StoreOwnership.verify(store: foreign, fingerprint: aliceFp, ownHash: aliceHash), .mismatch)
-        XCTAssertNil(try await foreign.meta(String.self, key: StoreOwnership.metaKey))
+        let refused = try await StoreOwnership.verify(store: foreign, fingerprint: aliceFp, ownHash: aliceHash)
+        XCTAssertEqual(refused, .mismatch)
+        let untouched = try await foreign.meta(String.self, key: StoreOwnership.metaKey)
+        XCTAssertNil(untouched)
     }
 
     func testQuarantineNamesAreOpaqueAndJournaled() {

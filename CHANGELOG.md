@@ -10,6 +10,18 @@ Full build notes, design decisions and the on-device test matrix live in
 
 ---
 
+## [1.21.1] — 2026-09-02 (build 23) — build fix
+
+### Fixed
+
+- **CI (`swift test`) was red on 1.21.0.** Fourteen assertions in
+  `TrustSafetyTests.swift` placed `await` inside an `XCTAssert*` autoclosure,
+  which Swift rejects. Every async result is now bound to a `let` first and
+  asserted afterwards; the assertions themselves are unchanged. No behaviour
+  change.
+
+---
+
 ## [1.21.0] — 2026-09-01 (build 22) — store-readiness round 2
 
 ### Added

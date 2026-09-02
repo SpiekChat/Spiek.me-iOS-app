@@ -1,4 +1,4 @@
-# Spiek.me — iOS app (v1.21.0)
+# Spiek.me — iOS app (v1.21.1)
 
 [![SpiekCore tests](https://github.com/SpiekChat/Spiek.me-iOS-app/actions/workflows/test.yml/badge.svg)](https://github.com/SpiekChat/Spiek.me-iOS-app/actions/workflows/test.yml)
 [![test count](https://img.shields.io/badge/SpiekCore_tests-176_passing_incl._moderation_%2B_protection-2b8a3e?style=flat-square)](#tests)
@@ -99,7 +99,7 @@ identical hex string, signatures included.
 
 ## App Store submission
 
-- Version: **1.21.0 (build 22)** — see [CHANGELOG.md](CHANGELOG.md)
+- Version: **1.21.1 (build 23)** — see [CHANGELOG.md](CHANGELOG.md)
 - `Spiek/PrivacyInfo.xcprivacy` present (no tracking; required-reason APIs
   C617.1 and E174.1 declared). The App Store privacy label is **not** "Data
   Not Collected": Spiek has no tracking and no analytics, but messages,

@@ -1537,7 +1537,7 @@ final class AppModel {
     /// the service answered with an id; otherwise it is logged as failed.
     func report(category: String, channelId: String, txid: String?, sender: String?, op: String?, plaintext: String?, note: String) async -> Bool {
         guard let store else { return false }
-        var body: [String: Any] = ["category": category, "channelId": channelId, "note": String(note.prefix(2000)), "app": "ios/1.21.0"]
+        var body: [String: Any] = ["category": category, "channelId": channelId, "note": String(note.prefix(2000)), "app": "ios/1.21.1"]
         if let txid { body["txid"] = txid }
         if let sender { body["sender"] = sender }
         if let op { body["op"] = op }

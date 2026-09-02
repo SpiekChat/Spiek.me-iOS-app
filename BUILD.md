@@ -551,9 +551,9 @@ need to relaunch.
 ## 12. Version history
 
 Marketing version and build number track the release number: this build
-ships as **1.21.0 (build 22)** — see [CHANGELOG.md](CHANGELOG.md) for 1.20.0
+ships as **1.21.1 (build 23)** — see [CHANGELOG.md](CHANGELOG.md) for 1.20.0
 (encrypted groups, BSV21 balances, fuzzing), 1.20.1 (keyed invites as
-secrets, documentation corrections) and 1.21.0 (store-readiness round 2). The notes below are the v17 review
+secrets, documentation corrections), 1.21.0 (store-readiness round 2) and 1.21.1 (build fix). The notes below are the v17 review
 round, kept for history.
 
 ### v17 — 1.17.0
